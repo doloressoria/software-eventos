@@ -78,7 +78,16 @@ export async function listEventos() {
 
 export type EventoCalendario = Pick<
   Tables<"eventos">,
-  "id" | "fecha_evento" | "cliente_nombre" | "estado" | "tipo_evento" | "salon_id"
+  | "id"
+  | "fecha_evento"
+  | "cliente_nombre"
+  | "estado"
+  | "tipo_evento"
+  | "salon_id"
+  | "pax_adultos"
+  | "pax_jovenes"
+  | "pax_menores"
+  | "pax_bebes"
 > & {
   salones: Pick<Tables<"salones">, "id" | "nombre"> | null;
 };
@@ -191,7 +200,7 @@ export async function getDashboardCalendarData(monthParam?: string) {
   const eventosQuery = supabase
     .from("eventos")
     .select(
-      "id, fecha_evento, cliente_nombre, estado, tipo_evento, salon_id, salones(id, nombre)",
+      "id, fecha_evento, cliente_nombre, estado, tipo_evento, salon_id, pax_adultos, pax_jovenes, pax_menores, pax_bebes, salones(id, nombre)",
     )
     .gte("fecha_evento", rangeStart)
     .lt("fecha_evento", rangeEnd)
