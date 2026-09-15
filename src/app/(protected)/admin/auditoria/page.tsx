@@ -6,7 +6,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DatePickerField } from "@/components/ui/date-picker-field";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Input, Label } from "@/components/ui/form";
+import { Label } from "@/components/ui/form";
 import { PageHeader } from "@/components/ui/page-header";
 import {
   Select,
@@ -16,14 +16,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   AUDITED_TABLES,
   AUDIT_ACTIONS,
   hasAuditFilters,
@@ -32,7 +24,10 @@ import {
   type AuditSearchParams,
 } from "@/lib/audit/filters";
 import {
+  formatAuditDateTime,
+  formatAuditValue,
   getActionLabel,
+  getAuditActivity,
   getAuditObject,
   getAuditSummary,
   getDisplayAction,
@@ -64,8 +59,8 @@ export default async function AuditoriaPage({
     <section className="space-y-6">
       <PageHeader
         eyebrow="Admin"
-        title="Auditoria administrativa"
-        description="Consulta el historial inmutable de cambios importantes realizados dentro del sistema."
+        title="Auditoría"
+        description="Consultá las acciones importantes realizadas en el sistema."
         actions={
           <Link
             href="/admin"
@@ -80,24 +75,16 @@ export default async function AuditoriaPage({
         <CardHeader>
           <CardTitle>Filtros</CardTitle>
           <p className="mt-1 text-sm text-slate-500">
-            Todos los filtros se combinan y se aplican en la consulta al servidor.
+            Encontrá acciones por fecha, responsable o tipo de elemento.
           </p>
         </CardHeader>
         <CardContent>
           <form className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <FilterDate
-              defaultValue={filters.dateFrom}
-              label="Desde"
-              name="desde"
-            />
-            <FilterDate
-              defaultValue={filters.dateTo}
-              label="Hasta"
-              name="hasta"
-            />
+            <FilterDate defaultValue={filters.dateFrom} label="Desde" name="desde" />
+            <FilterDate defaultValue={filters.dateTo} label="Hasta" name="hasta" />
             <FilterSelect
               defaultValue={filters.userId}
-              label="Usuario"
+              label="Responsable"
               name="usuario"
               options={[
                 { label: "Todos", value: "todos" },
@@ -109,7 +96,7 @@ export default async function AuditoriaPage({
             />
             <FilterSelect
               defaultValue={filters.action}
-              label="Accion"
+              label="Acción"
               name="accion"
               options={[
                 { label: "Todas", value: "todas" },
@@ -121,32 +108,26 @@ export default async function AuditoriaPage({
             />
             <FilterSelect
               defaultValue={filters.table}
-              label="Entidad"
+              label="Tipo de elemento"
               name="tabla"
               options={[
-                { label: "Todas", value: "todas" },
+                { label: "Todos", value: "todos" },
                 ...AUDITED_TABLES.map((table) => ({
                   label: getTableLabel(table),
                   value: table,
                 })),
               ]}
             />
-            <FilterInput
-              defaultValue={filters.recordId}
-              label="ID del registro"
-              name="registro"
-              placeholder="UUID o ID compuesto exacto"
-            />
             <FilterSelect
               defaultValue={filters.order}
               label="Orden"
               name="orden"
               options={[
-                { label: "Mas recientes primero", value: "desc" },
-                { label: "Mas antiguos primero", value: "asc" },
+                { label: "Más recientes primero", value: "desc" },
+                { label: "Más antiguos primero", value: "asc" },
               ]}
             />
-            <div className="flex items-end gap-3">
+            <div className="flex items-end gap-3 md:col-span-2">
               {hasFilters ? (
                 <Link
                   href="/admin/auditoria"
@@ -155,10 +136,7 @@ export default async function AuditoriaPage({
                   Limpiar filtros
                 </Link>
               ) : null}
-              <button
-                type="submit"
-                className={buttonVariants({ variant: "primary" })}
-              >
+              <button type="submit" className={buttonVariants({ variant: "primary" })}>
                 Aplicar filtros
               </button>
             </div>
@@ -169,13 +147,13 @@ export default async function AuditoriaPage({
       <Card className="overflow-hidden">
         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle>Historial de cambios</CardTitle>
+            <CardTitle>Historial de actividad</CardTitle>
             <p className="mt-1 text-sm text-slate-500">
               {total > 0
                 ? `Mostrando ${firstResult}-${lastResult} de ${total} registros`
                 : hasFilters
                   ? "No hay resultados para los filtros aplicados"
-                  : "Todavia no hay registros de auditoria"}
+                  : "Todavía no hay registros de auditoría"}
             </p>
           </div>
           <Badge variant="primary">Solo administradores</Badge>
@@ -183,89 +161,77 @@ export default async function AuditoriaPage({
 
         {logs.length > 0 ? (
           <>
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead scope="col">Fecha</TableHead>
-                  <TableHead scope="col">Usuario</TableHead>
-                  <TableHead scope="col">Entidad y registro</TableHead>
-                  <TableHead scope="col">Accion</TableHead>
-                  <TableHead scope="col">Resumen</TableHead>
-                  <TableHead scope="col">Detalle</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {logs.map((log) => {
-                  const displayAction = getDisplayAction({
-                    action: log.accion,
-                    afterValue: log.datos_nuevos,
-                    beforeValue: log.datos_anteriores,
-                    table: log.tabla,
-                  });
-                  const eventId = getEventId(log);
+            <div className="divide-y divide-slate-100">
+              {logs.map((log) => {
+                const action = getDisplayAction({
+                  action: log.accion,
+                  afterValue: log.datos_nuevos,
+                  beforeValue: log.datos_anteriores,
+                  table: log.tabla,
+                });
+                const context = getContextLabel(log);
+                const eventId = getEventId(log);
+                const summary = getAuditSummary(
+                  log.datos_anteriores,
+                  log.datos_nuevos,
+                );
 
-                  return (
-                    <TableRow key={log.id}>
-                      <TableCell className="whitespace-nowrap text-slate-600">
-                        {formatDateTime(log.created_at)}
-                      </TableCell>
-                      <TableCell className="min-w-52">
-                        <p className="font-medium text-slate-950">
-                          {log.usuarios?.full_name?.trim() ||
-                            log.usuarios?.email ||
-                            "Responsable no disponible"}
-                        </p>
-                        <p className="mt-1 break-all text-xs text-slate-500">
-                          {log.usuarios?.email ?? log.usuario_id ?? "Operacion del sistema"}
-                        </p>
-                      </TableCell>
-                      <TableCell className="min-w-56">
-                        <p className="font-medium text-slate-950">
-                          {getTableLabel(log.tabla)}
-                        </p>
-                        <p className="mt-1 break-all font-mono text-xs text-slate-500">
-                          {log.registro_id}
-                        </p>
-                        {getContextLabel(log) ? (
-                          <p className="mt-1 text-xs text-slate-600">
-                            {getContextLabel(log)}
-                          </p>
-                        ) : null}
-                        {eventId ? (
-                          <Link
-                            href={`/eventos/${eventId}`}
-                            className="mt-2 inline-block text-xs font-medium text-teal-700 hover:underline"
-                          >
-                            Abrir evento
-                          </Link>
-                        ) : null}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getActionVariant(displayAction)}>
-                          {getActionLabel(displayAction)}
+                return (
+                  <article
+                    key={log.id}
+                    className="grid gap-4 px-5 py-5 transition-colors hover:bg-slate-50 sm:px-6 lg:grid-cols-[10rem_minmax(11rem,0.8fr)_minmax(15rem,1.35fr)_minmax(11rem,0.75fr)] lg:items-start"
+                  >
+                    <time
+                      dateTime={log.created_at}
+                      className="text-sm font-medium text-slate-600"
+                    >
+                      {formatAuditDateTime(log.created_at)}
+                    </time>
+
+                    <Responsible user={log.usuarios} />
+
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant={getActionVariant(action)}>
+                          {getActionLabel(action)}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="min-w-64 text-slate-600">
-                        {getAuditSummary(
-                          log.datos_anteriores,
-                          log.datos_nuevos,
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <AuditDetail log={log} />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                        <p className="font-semibold text-slate-950">
+                          {getAuditActivity(action, log.tabla)}
+                        </p>
+                      </div>
+                      {context ? (
+                        <p className="mt-2 break-words text-sm text-slate-600">
+                          <span className="font-medium text-slate-700">{context.label}:</span>{" "}
+                          {context.value}
+                        </p>
+                      ) : null}
+                      {summary ? (
+                        <p className="mt-1.5 text-sm text-slate-500">
+                          Cambios: {summary}
+                        </p>
+                      ) : null}
+                      {eventId ? (
+                        <Link
+                          href={`/eventos/${eventId}`}
+                          className="mt-2 inline-block text-sm font-medium text-teal-700 hover:text-teal-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/25"
+                        >
+                          Abrir evento
+                        </Link>
+                      ) : null}
+                    </div>
+
+                    <AuditDetail log={log} />
+                  </article>
+                );
+              })}
+            </div>
 
             <nav
-              aria-label="Paginacion del historial"
+              aria-label="Paginación del historial"
               className="flex flex-col gap-3 border-t border-slate-100 px-6 py-4 sm:flex-row sm:items-center sm:justify-between"
             >
               <p className="text-sm text-slate-500">
-                Pagina {filters.page} de {totalPages}
+                Página {filters.page} de {totalPages}
               </p>
               <div className="flex gap-2">
                 {filters.page > 1 ? (
@@ -292,12 +258,12 @@ export default async function AuditoriaPage({
             title={
               hasFilters
                 ? "No hay cambios con estos filtros"
-                : "Todavia no hay cambios auditados"
+                : "Todavía no hay cambios auditados"
             }
             description={
               hasFilters
-                ? "Proba otra combinacion o limpia los filtros para ver todo el historial."
-                : "Las altas, ediciones, eliminaciones y asignaciones apareceran aca."
+                ? "Probá otra combinación o limpiá los filtros para ver todo el historial."
+                : "Las altas, ediciones y eliminaciones aparecerán acá."
             }
             action={
               hasFilters ? (
@@ -316,27 +282,22 @@ export default async function AuditoriaPage({
   );
 }
 
-function FilterInput({
-  defaultValue,
-  label,
-  name,
-  ...props
+function Responsible({
+  user,
 }: {
-  defaultValue?: string;
-  label: string;
-  name: string;
-  placeholder?: string;
+  user: { email: string; full_name: string | null } | null;
 }) {
+  const name = user?.full_name?.trim();
+  const email = user?.email;
+
   return (
-    <div>
-      <Label htmlFor={name}>{label}</Label>
-      <Input
-        id={name}
-        name={name}
-        type="search"
-        defaultValue={defaultValue}
-        {...props}
-      />
+    <div className="min-w-0">
+      <p className="break-words font-medium text-slate-950">
+        {name || email || "Operación del sistema"}
+      </p>
+      {name && email ? (
+        <p className="mt-1 break-all text-xs text-slate-500">{email}</p>
+      ) : null}
     </div>
   );
 }
@@ -377,10 +338,7 @@ function FilterSelect({
   return (
     <div>
       <Label htmlFor={name}>{label}</Label>
-      <Select
-        name={name}
-        defaultValue={defaultValue ?? options[0]?.value}
-      >
+      <Select name={name} defaultValue={defaultValue ?? options[0]?.value}>
         <SelectTrigger id={name}>
           <SelectValue />
         </SelectTrigger>
@@ -396,10 +354,7 @@ function FilterSelect({
   );
 }
 
-function getUserOptionLabel(user: {
-  email: string;
-  full_name: string | null;
-}) {
+function getUserOptionLabel(user: { email: string; full_name: string | null }) {
   const name = user.full_name?.trim();
   return name ? `${name} (${user.email})` : user.email;
 }
@@ -430,29 +385,30 @@ function getEventId(
 function getContextLabel(
   log: Awaited<ReturnType<typeof listAuditLogs>>["logs"][number],
 ) {
-  const after = getAuditObject(log.datos_nuevos);
-  const before = getAuditObject(log.datos_anteriores);
-  const snapshot = { ...before, ...after };
-  const value =
-    snapshot.nombre_evento ??
-    snapshot.cliente_nombre ??
-    snapshot.full_name ??
-    snapshot.nombre ??
-    snapshot.concepto;
-  return typeof value === "string" && value.trim() ? value : null;
-}
+  const snapshot = {
+    ...getAuditObject(log.datos_anteriores),
+    ...getAuditObject(log.datos_nuevos),
+  };
+  const context = [
+    ["nombre_evento", "Evento"],
+    ["nombre", "Nombre"],
+    ["cliente_nombre", "Cliente"],
+    ["proveedor", "Proveedor"],
+    ["concepto", "Concepto"],
+  ] as const;
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("es-AR", {
-    dateStyle: "short",
-    timeStyle: "short",
-    timeZone: "America/Argentina/Buenos_Aires",
-  }).format(new Date(value));
+  for (const [field, label] of context) {
+    const value = snapshot[field];
+    const formatted = formatAuditValue(value, field);
+    if (formatted) return { label, value: formatted };
+  }
+
+  return null;
 }
 
 function getActionVariant(
   action: ReturnType<typeof getDisplayAction>,
-): "danger" | "success" | "warning" | "primary" | "neutral" {
+): "danger" | "success" | "warning" {
   if (action === "DELETE" || action === "SOFT_DELETE" || action === "UNASSIGN") {
     return "danger";
   }

@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  formatAuditDateTime,
+  formatAuditValue,
+  getAuditActivity,
   getAuditChanges,
+  getAuditFieldsForAction,
   getAuditObject,
   getDisplayAction,
   getFieldLabel,
@@ -9,17 +13,31 @@ import {
 } from "./presentation";
 
 test("una creacion presenta principalmente valores nuevos", () => {
-  const changes = getAuditChanges(null, {
+  const snapshot = getAuditFieldsForAction("INSERT", null, {
     cliente_nombre: "Ana",
+    id: "676b60d7-6d59-44c0-bd84-679012fb03a9",
     estado: "borrador",
   });
 
   assert.deepEqual(
-    changes.map(({ after, before, field }) => ({ after, before, field })),
+    snapshot.map(({ field, value }) => ({ field, value })),
     [
-      { after: "Ana", before: undefined, field: "cliente_nombre" },
-      { after: "borrador", before: undefined, field: "estado" },
+      { field: "cliente_nombre", value: "Ana" },
+      { field: "estado", value: "borrador" },
     ],
+  );
+});
+
+test("una eliminacion conserva solo los datos anteriores utiles", () => {
+  const snapshot = getAuditFieldsForAction(
+    "DELETE",
+    { id: "676b60d7-6d59-44c0-bd84-679012fb03a9", precio_base: 100000, proveedor: "KIRIA" },
+    null,
+  );
+
+  assert.deepEqual(
+    snapshot.map(({ field }) => field),
+    ["precio_base", "proveedor"],
   );
 });
 
@@ -89,4 +107,27 @@ test("centraliza nombres legibles de entidades y campos", () => {
   assert.equal(getFieldLabel("fecha_evento"), "Fecha del evento");
   assert.equal(getFieldLabel("ipc_indice_id"), "Índice IPC");
   assert.equal(getFieldLabel("campo_futuro"), "Campo futuro");
+});
+
+test("formatea importes, fechas y booleanos sin datos tecnicos", () => {
+  assert.match(formatAuditValue(100000, "precio_base") ?? "", /100\.000/);
+  assert.equal(formatAuditValue(true, "activo"), "Sí");
+  assert.equal(formatAuditValue(false, "activo"), "No");
+  assert.doesNotMatch(
+    formatAuditValue("2026-09-09", "fecha_evento") ?? "",
+    /^2026-09-09$/,
+  );
+  assert.equal(
+    formatAuditValue("676b60d7-6d59-44c0-bd84-679012fb03a9"),
+    null,
+  );
+  assert.equal(formatAuditValue({ valor: "tecnico" }), null);
+  assert.match(formatAuditDateTime("2026-09-09T21:11:00.000Z"), / · /);
+});
+
+test("describe la actividad con lenguaje administrativo", () => {
+  assert.equal(
+    getAuditActivity("DELETE", "evento_servicios"),
+    "Eliminó un servicio del evento",
+  );
 });

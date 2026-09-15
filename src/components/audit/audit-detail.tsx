@@ -1,26 +1,17 @@
-import type { Tables } from "@/types/database.types";
+import { ArrowRight, ChevronDown } from "lucide-react";
+import type { Json, Tables } from "@/types/database.types";
 import {
   formatAuditValue,
-  getActionLabel,
   getAuditChanges,
+  getAuditDetailTitle,
+  getAuditFieldsForAction,
   getDisplayAction,
-  getFieldLabel,
-  getTableLabel,
-  safeJsonStringify,
 } from "@/lib/audit/presentation";
 
 type AuditLogDetail = Pick<
   Tables<"audit_log">,
-  | "accion"
-  | "created_at"
-  | "datos_anteriores"
-  | "datos_nuevos"
-  | "registro_id"
-  | "tabla"
-  | "usuario_id"
-> & {
-  usuarios: { email: string; full_name: string | null } | null;
-};
+  "accion" | "datos_anteriores" | "datos_nuevos" | "tabla"
+>;
 
 export function AuditDetail({ log }: { log: AuditLogDetail }) {
   const action = getDisplayAction({
@@ -30,132 +21,79 @@ export function AuditDetail({ log }: { log: AuditLogDetail }) {
     table: log.tabla,
   });
   const changes = getAuditChanges(log.datos_anteriores, log.datos_nuevos);
+  const snapshot = getAuditFieldsForAction(
+    action,
+    log.datos_anteriores,
+    log.datos_nuevos,
+  );
+  const showChanges = action === "UPDATE";
 
   return (
-    <details className="group">
-      <summary className="cursor-pointer list-none text-sm font-medium text-teal-700 hover:text-teal-800 group-open:mb-4">
-        <span className="group-open:hidden">Ver detalle</span>
-        <span className="hidden group-open:inline">Ocultar detalle</span>
+    <details className="group rounded-xl border border-slate-200 bg-slate-50/70 open:border-teal-100 lg:open:col-start-3 lg:open:col-span-2">
+      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-5 py-3 text-base font-medium text-teal-700 outline-none transition hover:bg-teal-50 hover:text-teal-800 focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:ring-offset-2">
+        <span className="group-open:hidden">Ver cambios</span>
+        <span className="hidden group-open:inline">Ocultar cambios</span>
+        <ChevronDown className="size-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
       </summary>
 
-      <div className="min-w-[42rem] space-y-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-        <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Metadata label="Fecha y hora" value={formatDateTime(log.created_at)} />
-          <Metadata
-            label="Responsable"
-            value={
-              log.usuarios
-                ? formatResponsible(log.usuarios)
-                : log.usuario_id
-                  ? `Usuario inexistente (${log.usuario_id})`
-                  : "Operacion del sistema o responsable no disponible"
-            }
-          />
-          <Metadata label="Accion" value={getActionLabel(action)} />
-          <Metadata label="Entidad" value={getTableLabel(log.tabla)} />
-          <Metadata label="ID del registro" value={log.registro_id} mono />
-          <Metadata
-            label="Campos cambiados"
-            value={String(changes.length)}
-          />
-        </dl>
+      <div className="border-t border-slate-200 px-4 py-4 sm:px-5">
+        <h3 className="text-sm font-semibold text-slate-900">
+          {getAuditDetailTitle(action)}
+        </h3>
 
-        {changes.length > 0 ? (
-          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-            <table className="w-full text-left text-xs">
-              <thead className="border-b border-slate-200 bg-slate-100/80 text-slate-600">
-                <tr>
-                  <th className="px-3 py-2 font-semibold">Campo</th>
-                  <th className="px-3 py-2 font-semibold">Valor anterior</th>
-                  <th className="px-3 py-2 font-semibold">Valor nuevo</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {changes.map((change) => (
-                  <tr key={change.field}>
-                    <th className="px-3 py-2.5 font-semibold text-slate-700">
-                      {getFieldLabel(change.field)}
-                    </th>
-                    <td className="max-w-72 whitespace-pre-wrap break-words px-3 py-2.5 text-slate-500">
-                      {formatAuditValue(change.before)}
-                    </td>
-                    <td className="max-w-72 whitespace-pre-wrap break-words px-3 py-2.5 font-medium text-slate-800">
-                      {formatAuditValue(change.after)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        {showChanges ? (
+          changes.length > 0 ? (
+            <dl className="mt-3 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+              {changes.map((change) => (
+                <div
+                  key={change.field}
+                  className="grid gap-1 px-3 py-3 sm:grid-cols-[minmax(10rem,0.45fr)_minmax(0,1fr)] sm:gap-4"
+                >
+                  <dt className="text-sm font-medium text-slate-700">
+                    {change.label}
+                  </dt>
+                  <dd className="flex min-w-0 items-center gap-2 text-base">
+                    <span className="min-w-0 break-words tabular-nums text-slate-500">
+                      {displayValue(change.before, change.field)}
+                    </span>
+                    <ArrowRight className="size-4 shrink-0 text-slate-400" aria-hidden="true" />
+                    <span className="min-w-0 break-words tabular-nums font-medium text-slate-900">
+                      {displayValue(change.after, change.field)}
+                    </span>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          ) : (
+            <EmptyDetail />
+          )
+        ) : snapshot.length > 0 ? (
+          <dl className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+            {snapshot.map((field) => (
+              <div key={field.field} className="min-w-0">
+                <dt className="text-xs font-medium text-slate-500">{field.label}</dt>
+                <dd className="mt-1 break-words text-base font-medium tabular-nums text-slate-800">
+                  {displayValue(field.value, field.field)}
+                </dd>
+              </div>
+            ))}
+          </dl>
         ) : (
-          <p className="text-sm text-slate-500">
-            No hay campos funcionales disponibles para comparar.
-          </p>
+          <EmptyDetail />
         )}
-
-        <details>
-          <summary className="cursor-pointer text-xs font-medium text-slate-600 hover:text-slate-900">
-            Ver JSON original
-          </summary>
-          <div className="mt-3 grid gap-3 lg:grid-cols-2">
-            <JsonBlock label="Datos anteriores" value={log.datos_anteriores} />
-            <JsonBlock label="Datos nuevos" value={log.datos_nuevos} />
-          </div>
-        </details>
       </div>
     </details>
   );
 }
 
-function Metadata({
-  label,
-  mono = false,
-  value,
-}: {
-  label: string;
-  mono?: boolean;
-  value: string;
-}) {
+function EmptyDetail() {
   return (
-    <div>
-      <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-        {label}
-      </dt>
-      <dd
-        className={`mt-1 break-words text-xs text-slate-800 ${mono ? "font-mono" : ""}`}
-      >
-        {value}
-      </dd>
-    </div>
+    <p className="mt-2 text-sm text-slate-500">
+      No hay información adicional disponible para este registro.
+    </p>
   );
 }
 
-function JsonBlock({
-  label,
-  value,
-}: {
-  label: string;
-  value: Tables<"audit_log">["datos_anteriores"];
-}) {
-  return (
-    <div>
-      <p className="text-xs font-semibold text-slate-700">{label}</p>
-      <pre className="mt-1 max-h-72 overflow-auto rounded-lg bg-slate-950 p-3 text-[11px] leading-5 text-slate-100">
-        {safeJsonStringify(value)}
-      </pre>
-    </div>
-  );
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("es-AR", {
-    dateStyle: "short",
-    timeStyle: "medium",
-    timeZone: "America/Argentina/Buenos_Aires",
-  }).format(new Date(value));
-}
-
-function formatResponsible(user: { email: string; full_name: string | null }) {
-  const name = user.full_name?.trim();
-  return name ? `${name} (${user.email})` : user.email;
+function displayValue(value: Json | null | undefined, field: string) {
+  return formatAuditValue(value, field) ?? "—";
 }
