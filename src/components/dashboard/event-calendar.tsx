@@ -129,6 +129,7 @@ export function EventCalendar({
                 <div className="flex max-h-24 flex-col gap-1 overflow-y-auto pr-0.5">
                   {dayEventos.map((evento) => {
                     const colors = getSalonColorClasses(evento.salon_id);
+                    const pax = getPaxTotal(evento);
                     return (
                       <Link
                         key={evento.id}
@@ -137,10 +138,13 @@ export function EventCalendar({
                           "flex items-center gap-1.5 truncate rounded border px-1.5 py-1 text-xs font-medium transition hover:opacity-80",
                           colors.chip,
                         )}
-                        title={`${evento.cliente_nombre} - ${evento.salones?.nombre ?? "Sin salon"}`}
+                        title={`${evento.cliente_nombre} - ${evento.salones?.nombre ?? "Sin salon"} - ${pax} personas`}
                       >
                         <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", colors.dot)} />
                         <span className="truncate">{evento.cliente_nombre}</span>
+                        <span className="ml-auto shrink-0 tabular-nums opacity-70">
+                          {pax}p
+                        </span>
                       </Link>
                     );
                   })}
@@ -162,7 +166,33 @@ export function EventCalendar({
           <Badge variant="neutral">{eventos.length} eventos este mes</Badge>
         </div>
       )}
+
+      {salones.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs text-slate-600">
+          <span className="font-semibold uppercase tracking-[0.08em] text-slate-400">
+            Salones
+          </span>
+          {salones.map((salon) => {
+            const colors = getSalonColorClasses(salon.id);
+            return (
+              <span key={salon.id} className="flex items-center gap-1.5">
+                <span className={cn("h-2 w-2 shrink-0 rounded-full", colors.dot)} />
+                {salon.nombre}
+              </span>
+            );
+          })}
+        </div>
+      ) : null}
     </Card>
+  );
+}
+
+function getPaxTotal(evento: EventoCalendario) {
+  return (
+    (evento.pax_adultos ?? 0) +
+    (evento.pax_jovenes ?? 0) +
+    (evento.pax_menores ?? 0) +
+    (evento.pax_bebes ?? 0)
   );
 }
 
