@@ -4,10 +4,12 @@ Production-ready web application foundation for managing events, venues,
 catering operations, sellers, payments, balances, debtors, audit logs and
 financial reports.
 
-The app has two intended roles:
+The app has configurable operational roles:
 
-- `admin`: manages users, venues, events, payments, audit logs and reports.
-- `seller`: accesses only assigned venues and related events/payments.
+- `Administrador`: manages users, roles, venues, events, payments, audit logs
+  and reports.
+- Roles operativos: choose whether each module can be viewed or managed.
+  Users retain their own venue assignments, which limit event access.
 
 ## Tech Stack
 
@@ -47,7 +49,9 @@ public logs.
 
 ## Administrative User Management
 
-Administrators manage users at `/admin/usuarios`. Creating a user uses the
+Administrators manage users at `/admin/usuarios` and configure roles at
+`/admin/roles`. A role enables modules; venue access remains assigned per user,
+so two users with the same role can work on different venues. Creating a user uses the
 server-only Supabase Admin API and generates a strong temporary password. The
 password is displayed once after creation, is never stored in `public.usuarios`
 or `audit_log`, and must be communicated through a secure channel.

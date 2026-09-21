@@ -15,7 +15,7 @@ export default async function EditarUsuarioPage({
   params,
 }: EditarUsuarioPageProps) {
   const { id } = await params;
-  const { currentProfile, salonIds, salones, user } =
+  const { currentProfile, roleId, roles, salonIds, salones, user } =
     await getUsuarioEditPageData(id);
   const initialState: UsuarioFormState = {
     errors: {},
@@ -23,7 +23,7 @@ export default async function EditarUsuarioPage({
       activo: user.activo,
       email: user.email,
       fullName: user.full_name,
-      rol: user.rol,
+      roleId,
       salonIds,
     },
     formError: null,
@@ -56,6 +56,7 @@ export default async function EditarUsuarioPage({
         initialState={initialState}
         isSelf={currentProfile.id === user.id}
         mode="edit"
+        roles={roles}
         salones={salones}
       />
     </section>

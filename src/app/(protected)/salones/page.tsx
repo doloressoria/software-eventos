@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { listSalones } from "@/lib/salones/queries";
+import { canUseScreen, getCurrentScreenPermissions } from "@/lib/roles/access";
 
 type SalonesPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -24,10 +25,14 @@ type SalonesPageProps = {
 export default async function SalonesPage({
   searchParams,
 }: SalonesPageProps) {
-  const { profile, salones } = await listSalones();
+  const [{ profile, salones }, permissions] = await Promise.all([
+    listSalones(),
+    getCurrentScreenPermissions(),
+  ]);
   const params = searchParams ? await searchParams : {};
   const statusMessage = getStatusMessage(params);
   const isAdmin = profile.rol === "admin";
+  const canManage = canUseScreen(permissions, "salones", true);
 
   return (
     <section className="space-y-6">
@@ -40,20 +45,20 @@ export default async function SalonesPage({
             : "Consulta los salones activos asignados a tu usuario vendedor."
         }
         actions={
-          isAdmin ? (
+          canManage ? (
             <>
-              <Link
+              {isAdmin ? <Link
                 href="/salones/asignaciones"
                 className={buttonVariants({ variant: "secondary" })}
               >
                 Asignaciones
-              </Link>
-              <Link
+              </Link> : null}
+              {isAdmin ? <Link
                 href="/salones/nuevo"
                 className={buttonVariants({ variant: "primary" })}
               >
                 Nuevo salon
-              </Link>
+              </Link> : null}
             </>
           ) : null
         }
@@ -90,7 +95,7 @@ export default async function SalonesPage({
                 <TableHead scope="col">Direccion</TableHead>
                 <TableHead scope="col">Capacidad</TableHead>
                 <TableHead scope="col">Estado</TableHead>
-                {isAdmin ? (
+                {canManage ? (
                   <TableHead scope="col" className="text-right">
                     Acciones
                   </TableHead>
@@ -127,7 +132,7 @@ export default async function SalonesPage({
                       {salon.activo ? "Activo" : "Inactivo"}
                     </Badge>
                   </TableCell>
-                  {isAdmin ? (
+                  {canManage ? (
                     <TableCell>
                       <div className="flex justify-end gap-2">
                         <Link

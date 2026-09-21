@@ -14,15 +14,20 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { listEventos } from "@/lib/eventos/queries";
+import { canUseScreen, getCurrentScreenPermissions } from "@/lib/roles/access";
 
 type EventosPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
 export default async function EventosPage({ searchParams }: EventosPageProps) {
-  const { eventos, profile } = await listEventos();
+  const [{ eventos, profile }, permissions] = await Promise.all([
+    listEventos(),
+    getCurrentScreenPermissions(),
+  ]);
   const params = searchParams ? await searchParams : {};
   const isAdmin = profile.rol === "admin";
+  const canManage = canUseScreen(permissions, "eventos", true);
   const wasDeleted = Boolean(params.deleted);
 
   return (
@@ -31,14 +36,14 @@ export default async function EventosPage({ searchParams }: EventosPageProps) {
         eyebrow="Eventos"
         title="Gestion de eventos"
         description="Reservas, fechas, salones asociados y responsable comercial."
-        actions={
+        actions={canManage ? (
           <Link
             href="/eventos/nuevo"
             className={buttonVariants({ variant: "primary" })}
           >
             Nuevo evento
           </Link>
-        }
+        ) : null}
       />
 
       {wasDeleted ? (
@@ -138,14 +143,14 @@ export default async function EventosPage({ searchParams }: EventosPageProps) {
                 ? "Crea el primer evento para empezar a ver la agenda comercial."
                 : "Todavia no hay eventos en tus salones asignados."
             }
-            action={
+            action={canManage ? (
               <Link
                 href="/eventos/nuevo"
                 className={buttonVariants({ variant: "secondary" })}
               >
                 Preparar nuevo evento
               </Link>
-            }
+            ) : null}
           />
         )}
       </Card>

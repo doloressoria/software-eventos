@@ -27,6 +27,7 @@ import {
 } from "@/lib/egresos/validation";
 import { createClient } from "@/lib/supabase/server";
 import { logSupabaseError } from "@/lib/supabase/errors";
+import { requireScreenManagement } from "@/lib/roles/access";
 import type { TablesUpdate } from "@/types/database.types";
 
 export type DeleteCateringState = { formError?: string };
@@ -57,6 +58,7 @@ export async function createCateringAction(
   if (!profile?.activo) {
     redirect("/dashboard");
   }
+  await requireScreenManagement("catering");
 
   const { state, payload } = validateCateringForm(formData, { mode: "create" });
 
@@ -280,6 +282,7 @@ export async function addPrecioHistorialAction(
   if (!profile?.activo) {
     redirect("/dashboard");
   }
+  await requireScreenManagement("catering");
 
   const { state, payload } = validatePrecioHistorialForm(formData);
 
@@ -340,6 +343,7 @@ export async function addCateringItemAction(
   if (!profile?.activo) {
     redirect("/dashboard");
   }
+  await requireScreenManagement("catering");
 
   const { state, payload } = validateCateringItemForm(formData);
 
@@ -386,6 +390,7 @@ export async function deleteCateringItemAction(
   if (!profile?.activo) {
     redirect("/dashboard");
   }
+  await requireScreenManagement("catering");
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -608,6 +613,8 @@ export async function deleteCateringEgresoAction(
 }
 
 async function getCateringForMutation(cateringId: string) {
+  await requireScreenManagement("catering");
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("catering_contratos")

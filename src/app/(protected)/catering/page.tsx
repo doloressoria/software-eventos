@@ -13,13 +13,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getCateringDisplayFields, listCaterings } from "@/lib/catering/queries";
+import { canUseScreen, getCurrentScreenPermissions } from "@/lib/roles/access";
 
 type CateringPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
 export default async function CateringPage({ searchParams }: CateringPageProps) {
-  const caterings = await listCaterings();
+  const [caterings, permissions] = await Promise.all([
+    listCaterings(),
+    getCurrentScreenPermissions(),
+  ]);
+  const canManage = canUseScreen(permissions, "catering", true);
   const params = searchParams ? await searchParams : {};
   const wasDeleted = Boolean(params.deleted);
 
@@ -29,11 +34,11 @@ export default async function CateringPage({ searchParams }: CateringPageProps) 
         eyebrow="Catering"
         title="Panel de caterings"
         description="Catering vinculado a eventos de salon y catering externo contratado directamente."
-        actions={
+        actions={canManage ? (
           <Link href="/catering/nuevo" className={buttonVariants({ variant: "primary" })}>
             Nuevo catering
           </Link>
-        }
+        ) : null}
       />
 
       {wasDeleted ? (
@@ -112,11 +117,11 @@ export default async function CateringPage({ searchParams }: CateringPageProps) 
           <EmptyState
             title="No hay caterings cargados"
             description="Crea el primer catering vinculado a un evento o externo."
-            action={
+            action={canManage ? (
               <Link href="/catering/nuevo" className={buttonVariants({ variant: "secondary" })}>
                 Nuevo catering
               </Link>
-            }
+            ) : null}
           />
         )}
       </Card>

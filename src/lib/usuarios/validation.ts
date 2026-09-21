@@ -1,15 +1,13 @@
-import type { UserManagementRole } from "./rules-core";
-
 export type UsuarioFormFields = {
   activo: boolean;
   email: string;
   fullName: string;
-  rol: UserManagementRole;
+  roleId: string;
   salonIds: string[];
 };
 
 export type UsuarioFormErrors = Partial<
-  Record<"email" | "fullName" | "rol" | "salonIds", string>
+  Record<"email" | "fullName" | "roleId" | "salonIds", string>
 >;
 
 export type UsuarioFormState = {
@@ -26,7 +24,7 @@ export const emptyUsuarioFormState: UsuarioFormState = {
     activo: true,
     email: "",
     fullName: "",
-    rol: "vendedor",
+    roleId: "",
     salonIds: [],
   },
   formError: null,
@@ -42,12 +40,12 @@ export function validateUsuarioForm(formData: FormData): {
   payload: UsuarioFormFields | null;
   state: UsuarioFormState;
 } {
-  const rawRole = getString(formData, "rol");
+  const roleId = getString(formData, "role_id");
   const fields: UsuarioFormFields = {
     activo: formData.get("activo") === "on",
     email: getString(formData, "email").trim().toLowerCase(),
     fullName: getString(formData, "full_name").trim(),
-    rol: isUserManagementRole(rawRole) ? rawRole : "vendedor",
+    roleId,
     salonIds: Array.from(new Set(formData.getAll("salon_ids")))
       .filter((value): value is string => typeof value === "string")
       .filter(Boolean),
@@ -68,16 +66,12 @@ export function validateUsuarioForm(formData: FormData): {
     errors.email = "El email no puede superar los 254 caracteres.";
   }
 
-  if (!isUserManagementRole(rawRole)) {
-    errors.rol = "El rol seleccionado no es valido.";
+  if (!uuidPattern.test(fields.roleId)) {
+    errors.roleId = "Selecciona un rol valido.";
   }
 
   if (fields.salonIds.some((id) => !uuidPattern.test(id))) {
     errors.salonIds = "Una de las asignaciones seleccionadas no es valida.";
-  }
-
-  if (fields.rol !== "vendedor") {
-    fields.salonIds = [];
   }
 
   const hasErrors = Object.keys(errors).length > 0;
@@ -98,8 +92,4 @@ function getString(formData: FormData, key: string) {
   const value = formData.get(key);
 
   return typeof value === "string" ? value : "";
-}
-
-function isUserManagementRole(value: string): value is UserManagementRole {
-  return value === "admin" || value === "vendedor" || value === "ejecutiva_catering";
 }

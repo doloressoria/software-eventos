@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentProfile, requireAdmin } from "@/lib/auth";
+import { requireScreenManagement } from "@/lib/roles/access";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/types/database.types";
 
@@ -34,7 +35,7 @@ export async function listSalones() {
 }
 
 export async function getSalonById(id: string) {
-  await requireAdmin();
+  await requireScreenManagement("salones");
 
   const supabase = await createClient();
   const { data, error } = await supabase

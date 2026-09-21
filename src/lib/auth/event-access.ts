@@ -1,6 +1,7 @@
 import { canAccessSalonWithAssignments } from "@/lib/auth/event-access-core";
 import { createClient } from "@/lib/supabase/server";
 import { logSupabaseError } from "@/lib/supabase/errors";
+import { requireScreenManagement } from "@/lib/roles/access";
 import type { CurrentProfile } from "@/lib/auth/get-current-profile";
 import type { Tables } from "@/types/database.types";
 
@@ -13,6 +14,8 @@ export async function getAuthorizedActiveEvento(
   eventoId: string,
   profile: CurrentProfile,
 ): Promise<AuthorizedActiveEvento | null> {
+  await requireScreenManagement("eventos");
+
   if (!profile.activo) {
     return null;
   }
@@ -88,4 +91,3 @@ export async function usuarioTieneSalon(usuarioId: string, salonId: string) {
       assignment.usuario_id === usuarioId && assignment.salon_id === salonId,
   );
 }
-

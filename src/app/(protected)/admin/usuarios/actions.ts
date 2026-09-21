@@ -24,6 +24,15 @@ export async function createUsuarioAction(
 
   if (!payload) return state;
 
+  const selectedRole = await getSelectedRole(payload.roleId);
+  if (!selectedRole) {
+    return {
+      ...state,
+      errors: { ...state.errors, roleId: "El rol seleccionado no existe." },
+      formError: "Revisa el rol seleccionado.",
+    };
+  }
+
   const salonError = await validateActiveSalonIds(payload.salonIds);
   if (salonError) {
     return {
@@ -64,7 +73,7 @@ export async function createUsuarioAction(
       p_email: payload.email,
       p_full_name: payload.fullName,
       p_id: authData.user.id,
-      p_rol: payload.rol,
+      p_rol: selectedRole.legacy_rol,
       p_salon_ids: payload.salonIds,
     },
   );
@@ -79,6 +88,16 @@ export async function createUsuarioAction(
           : state.errors,
       formError: getUsuarioMutationError(profileError, "crear"),
     };
+  }
+
+  const { error: roleError } = await supabase.rpc("admin_assign_usuario_role", {
+    p_role_id: selectedRole.id,
+    p_usuario_id: authData.user.id,
+  });
+
+  if (roleError) {
+    await cleanupCreatedAuthUser(authData.user.id);
+    return { ...state, formError: "No se pudo asignar el rol del usuario." };
   }
 
   revalidateUserPaths(authData.user.id);
@@ -104,6 +123,15 @@ export async function updateUsuarioAction(
 
   const { payload, state } = validateUsuarioForm(formData);
   if (!payload) return state;
+
+  const selectedRole = await getSelectedRole(payload.roleId);
+  if (!selectedRole) {
+    return {
+      ...state,
+      errors: { ...state.errors, roleId: "El rol seleccionado no existe." },
+      formError: "Revisa el rol seleccionado.",
+    };
+  }
 
   const salonError = await validateActiveSalonIds(payload.salonIds);
   if (salonError) {
@@ -133,7 +161,7 @@ export async function updateUsuarioAction(
     activeAdminCount: activeAdminsResult.count ?? 0,
     actorId: actor.id,
     nextActive: payload.activo,
-    nextRole: payload.rol,
+    nextRole: selectedRole.legacy_rol,
     targetId: target.id,
     targetWasActiveAdmin: target.rol === "admin" && target.activo,
   });
@@ -181,7 +209,7 @@ export async function updateUsuarioAction(
     p_email: payload.email,
     p_full_name: payload.fullName,
     p_id: id,
-    p_rol: payload.rol,
+    p_rol: selectedRole.legacy_rol,
     p_salon_ids: payload.salonIds,
   });
 
@@ -204,6 +232,15 @@ export async function updateUsuarioAction(
     };
   }
 
+  const { error: roleError } = await supabase.rpc("admin_assign_usuario_role", {
+    p_role_id: selectedRole.id,
+    p_usuario_id: id,
+  });
+
+  if (roleError) {
+    return { ...state, formError: "No se pudo asignar el rol del usuario." };
+  }
+
   revalidateUserPaths(id);
   redirect("/admin/usuarios?updated=1");
 }
@@ -224,6 +261,17 @@ async function validateActiveSalonIds(salonIds: string[]) {
   }
 
   return null;
+}
+
+async function getSelectedRole(roleId: string) {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("roles")
+    .select("id, legacy_rol")
+    .eq("id", roleId)
+    .maybeSingle();
+
+  return error ? null : data;
 }
 
 function generateTemporaryPassword() {

@@ -7,7 +7,8 @@ import { getUsuarioCreatePageData } from "@/lib/usuarios/queries";
 import { emptyUsuarioFormState } from "@/lib/usuarios/validation";
 
 export default async function NuevoUsuarioPage() {
-  const { salones } = await getUsuarioCreatePageData();
+  const { roles, salones } = await getUsuarioCreatePageData();
+  const defaultRole = roles.find((role) => role.legacy_rol === "vendedor") ?? roles[0];
 
   return (
     <section className="space-y-6">
@@ -26,8 +27,12 @@ export default async function NuevoUsuarioPage() {
       />
       <UsuarioForm
         action={createUsuarioAction}
-        initialState={emptyUsuarioFormState}
+        initialState={{
+          ...emptyUsuarioFormState,
+          fields: { ...emptyUsuarioFormState.fields, roleId: defaultRole?.id ?? "" },
+        }}
         mode="create"
+        roles={roles}
         salones={salones}
       />
     </section>

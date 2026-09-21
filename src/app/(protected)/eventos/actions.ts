@@ -16,6 +16,7 @@ import {
 } from "@/lib/eventos/validation";
 import { generateEventoName } from "@/lib/eventos/types";
 import { applyMonthlyServicePricesToEvento } from "@/lib/precios-servicios/precios-mensuales";
+import { requireScreenManagement } from "@/lib/roles/access";
 import type { Tables, TablesUpdate } from "@/types/database.types";
 
 type EditableEvento = Tables<"eventos">;
@@ -36,6 +37,7 @@ export async function createEventoAction(
   if (!profile?.activo) {
     redirect("/dashboard");
   }
+  await requireScreenManagement("eventos");
 
   const { state, payload } = validateEventoForm(formData, { mode: "create" });
 

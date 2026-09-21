@@ -19,6 +19,11 @@ export default async function AdminPage() {
       name: "Usuarios y roles",
     },
     {
+      description: "Módulos que cada rol puede ver o gestionar",
+      href: "/admin/roles",
+      name: "Roles y permisos",
+    },
+    {
       description: "Historial inmutable de cambios realizados en el sistema",
       href: "/admin/auditoria",
       name: "Auditoria",

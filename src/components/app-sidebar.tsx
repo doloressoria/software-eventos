@@ -16,24 +16,42 @@ import { usePathname } from "next/navigation";
 import type { ComponentType, SVGProps } from "react";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/utils/cn";
+import type { ScreenPermission } from "@/lib/roles/permissions";
 
-const navigation = [
+type NavigationItem = {
+  adminOnly?: boolean;
+  group: string;
+  href: string;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  name: string;
+  permission?: ScreenPermission;
+};
+
+const navigation: NavigationItem[] = [
   {
     name: "Dashboard",
     href: "/dashboard",
     group: "Operacion",
     icon: LayoutDashboard,
+    permission: "dashboard",
   },
-  { name: "Eventos", href: "/eventos", group: "Operacion", icon: CalendarDays },
-  { name: "Catering", href: "/catering", group: "Operacion", icon: UtensilsCrossed },
-  { name: "Salones", href: "/salones", group: "Gestion", icon: Store },
-  { name: "Pagos", href: "/pagos", group: "Finanzas", icon: Landmark },
-  { name: "Reportes", href: "/reportes", group: "Finanzas", icon: BarChart3 },
+  { name: "Eventos", href: "/eventos", group: "Operacion", icon: CalendarDays, permission: "eventos" },
+  { name: "Catering", href: "/catering", group: "Operacion", icon: UtensilsCrossed, permission: "catering" },
+  { name: "Salones", href: "/salones", group: "Gestion", icon: Store, permission: "salones" },
+  { name: "Pagos", href: "/pagos", group: "Finanzas", icon: Landmark, permission: "pagos" },
+  { name: "Reportes", href: "/reportes", group: "Finanzas", icon: BarChart3, permission: "reportes" },
   {
     name: "Usuarios",
     href: "/admin/usuarios",
     group: "Sistema",
     icon: Users,
+    adminOnly: true,
+  },
+  {
+    name: "Roles",
+    href: "/admin/roles",
+    group: "Sistema",
+    icon: Settings,
     adminOnly: true,
   },
   {
@@ -52,10 +70,10 @@ const navigation = [
   },
 ];
 
-export function AppSidebar({ isAdmin }: { isAdmin: boolean }) {
+export function AppSidebar({ isAdmin, permissions }: { isAdmin: boolean; permissions: string[] }) {
   const pathname = usePathname();
   const visibleNavigation = navigation.filter(
-    (item) => !item.adminOnly || isAdmin,
+    (item) => (!item.adminOnly || isAdmin) && (!item.permission || permissions.includes(item.permission)),
   );
 
   return (

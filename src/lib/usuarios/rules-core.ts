@@ -1,4 +1,22 @@
-export type UserManagementRole = "admin" | "vendedor" | "ejecutiva_catering";
+export const userManagementRoles = [
+  "admin",
+  "vendedor",
+  "ejecutiva_catering",
+] as const;
+
+export type UserManagementRole = (typeof userManagementRoles)[number];
+
+export const userManagementRoleLabels: Record<UserManagementRole, string> = {
+  admin: "Administrador",
+  vendedor: "Vendedor",
+  ejecutiva_catering: "Ejecutiva de catering",
+};
+
+export function isUserManagementRole(
+  value: string,
+): value is UserManagementRole {
+  return (userManagementRoles as readonly string[]).includes(value);
+}
 
 export type UserManagementProfile = {
   activo: boolean;

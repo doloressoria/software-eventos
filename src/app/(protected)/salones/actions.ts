@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireAdmin } from "@/lib/auth";
+import { requireScreenManagement } from "@/lib/roles/access";
 import { createClient } from "@/lib/supabase/server";
 import {
   type SalonFormState,
@@ -13,7 +13,7 @@ export async function createSalonAction(
   _previousState: SalonFormState,
   formData: FormData,
 ): Promise<SalonFormState> {
-  await requireAdmin();
+  await requireScreenManagement("salones");
 
   const { state, payload } = validateSalonForm(formData);
 
@@ -40,7 +40,7 @@ export async function updateSalonAction(
   _previousState: SalonFormState,
   formData: FormData,
 ): Promise<SalonFormState> {
-  await requireAdmin();
+  await requireScreenManagement("salones");
 
   const { state, payload } = validateSalonForm(formData);
 
@@ -70,7 +70,7 @@ export async function updateSalonAction(
 }
 
 export async function updateSalonStatusAction(formData: FormData) {
-  await requireAdmin();
+  await requireScreenManagement("salones");
 
   const id = formData.get("id");
   const active = formData.get("active");

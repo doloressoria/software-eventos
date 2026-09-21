@@ -963,6 +963,62 @@ export type Database = {
           },
         ]
       }
+      roles: {
+        Row: {
+          created_at: string
+          descripcion: string | null
+          es_sistema: boolean
+          id: string
+          legacy_rol: Database["public"]["Enums"]["rol_usuario"]
+          nombre: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          descripcion?: string | null
+          es_sistema?: boolean
+          id?: string
+          legacy_rol?: Database["public"]["Enums"]["rol_usuario"]
+          nombre: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          descripcion?: string | null
+          es_sistema?: boolean
+          id?: string
+          legacy_rol?: Database["public"]["Enums"]["rol_usuario"]
+          nombre?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      role_permissions: {
+        Row: {
+          can_manage: boolean
+          role_id: string
+          screen: string
+        }
+        Insert: {
+          can_manage?: boolean
+          role_id: string
+          screen: string
+        }
+        Update: {
+          can_manage?: boolean
+          role_id?: string
+          screen?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permissions_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       salones: {
         Row: {
           activo: boolean
@@ -1123,6 +1179,39 @@ export type Database = {
           },
         ]
       }
+      usuario_roles: {
+        Row: {
+          created_at: string
+          role_id: string
+          usuario_id: string
+        }
+        Insert: {
+          created_at?: string
+          role_id: string
+          usuario_id: string
+        }
+        Update: {
+          created_at?: string
+          role_id?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usuario_roles_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "usuario_roles_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: true
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       usuarios: {
         Row: {
           activo: boolean
@@ -1220,8 +1309,29 @@ export type Database = {
         }
         Returns: Database["public"]["Tables"]["usuarios"]["Row"]
       }
+      admin_assign_usuario_role: {
+        Args: { p_role_id: string; p_usuario_id: string }
+        Returns: undefined
+      }
+      admin_save_role: {
+        Args: {
+          p_descripcion: string
+          p_manage_screens?: string[]
+          p_nombre: string
+          p_role_id: string | null
+          p_screens: string[]
+        }
+        Returns: Database["public"]["Tables"]["roles"]["Row"]
+      }
       current_user_is_active: { Args: never; Returns: boolean }
       current_user_is_active_admin: { Args: never; Returns: boolean }
+      current_user_permissions: {
+        Args: never
+        Returns: {
+          can_manage: boolean
+          screen: string
+        }[]
+      }
       previsualizar_actualizacion_ipc: {
         Args: { p_periodo: string; p_variacion_porcentual: number }
         Returns: {

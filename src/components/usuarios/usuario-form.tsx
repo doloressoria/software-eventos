@@ -26,7 +26,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { UserManagementRole } from "@/lib/usuarios/rules-core";
 import type { UsuarioFormState } from "@/lib/usuarios/validation";
 
 type AssignableSalon = {
@@ -42,6 +41,7 @@ type UsuarioFormProps = {
   initialState: UsuarioFormState;
   isSelf?: boolean;
   mode: "create" | "edit";
+  roles: Array<{ id: string; nombre: string }>;
   salones: AssignableSalon[];
 };
 
@@ -50,12 +50,10 @@ export function UsuarioForm({
   initialState,
   isSelf = false,
   mode,
+  roles,
   salones,
 }: UsuarioFormProps) {
   const [state, formAction] = useActionState(action, initialState);
-  const [role, setRole] = useState<UserManagementRole>(
-    initialState.fields.rol,
-  );
   const [active, setActive] = useState(initialState.fields.activo);
   const [selectedSalonIds, setSelectedSalonIds] = useState(
     () => new Set(initialState.fields.salonIds),
@@ -97,32 +95,14 @@ export function UsuarioForm({
         "El usuario quedara desactivado y no podra continuar usando la aplicacion.",
       );
     }
-    if (
-      mode === "edit" &&
-      initialState.fields.rol === "admin" &&
-      role === "vendedor"
-    ) {
-      warnings.push("El usuario perdera el acceso global de administrador.");
-    }
     if (removedSalonNames.length > 0) {
       warnings.push(
         `Se quitaran estos salones: ${removedSalonNames.join(", ")}.`,
       );
     }
-    if (role === "vendedor" && selectedSalonIds.size === 0) {
+    if (selectedSalonIds.size === 0) {
       warnings.push(
-        "El vendedor quedara sin salones y posiblemente no podra acceder a ninguna unidad de negocio.",
-      );
-    }
-    if (
-      role !== "vendedor" &&
-      mode === "edit" &&
-      initialState.fields.salonIds.length > 0
-    ) {
-      warnings.push(
-        role === "admin"
-          ? "Las asignaciones anteriores se eliminaran porque los administradores tienen acceso global."
-          : "Las asignaciones anteriores se eliminaran porque las ejecutivas de catering no se asignan por salon.",
+        "El usuario quedara sin salones y no podra acceder a eventos de una sede asignada.",
       );
     }
 
@@ -195,29 +175,24 @@ export function UsuarioForm({
             </div>
 
             <div>
-              <Label htmlFor="rol">Rol</Label>
-              {isSelf ? <input type="hidden" name="rol" value="admin" /> : null}
+              <Label htmlFor="role_id">Rol</Label>
+              {isSelf ? <input type="hidden" name="role_id" value={state.fields.roleId} /> : null}
               <Select
-                name={isSelf ? undefined : "rol"}
-                value={role}
-                onValueChange={(value) =>
-                  setRole(value as UserManagementRole)
-                }
+                name={isSelf ? undefined : "role_id"}
+                defaultValue={state.fields.roleId}
                 disabled={isSelf}
               >
-                <SelectTrigger id="rol" aria-invalid={Boolean(state.errors.rol)}>
-                  <SelectValue />
+                <SelectTrigger id="role_id" aria-invalid={Boolean(state.errors.roleId)}>
+                  <SelectValue placeholder="Seleccionar rol" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="vendedor">Vendedor</SelectItem>
-                  <SelectItem value="ejecutiva_catering">
-                    Ejecutiva de catering
-                  </SelectItem>
-                  <SelectItem value="admin">Administrador</SelectItem>
+                  {roles.map((role) => (
+                    <SelectItem key={role.id} value={role.id}>{role.nombre}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-              {state.errors.rol ? (
-                <FieldError id="rol-error">{state.errors.rol}</FieldError>
+              {state.errors.roleId ? (
+                <FieldError id="role-id-error">{state.errors.roleId}</FieldError>
               ) : null}
             </div>
 
@@ -246,14 +221,14 @@ export function UsuarioForm({
             </Alert>
           ) : null}
 
-          <div className={role === "vendedor" ? "block" : "hidden"}>
+          <div>
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <h3 className="text-sm font-semibold text-slate-950">
                   Salones asignados
                 </h3>
                 <p className="mt-1 text-sm leading-6 text-slate-500">
-                  Solo se ofrecen salones activos. Se puede asignar mas de uno.
+                  Solo se ofrecen salones activos. Se puede asignar más de uno.
                 </p>
               </div>
               <span className="text-xs font-semibold text-teal-700">
@@ -286,15 +261,14 @@ export function UsuarioForm({
               </div>
             ) : (
               <Alert variant="warning" className="mt-4">
-                No hay salones activos disponibles. El vendedor se guardara sin
+                No hay salones activos disponibles. El usuario se guardara sin
                 asignaciones.
               </Alert>
             )}
 
             {selectedSalonIds.size === 0 ? (
               <Alert variant="warning" className="mt-4">
-                Un vendedor sin salones posiblemente no pueda acceder a ninguna
-                unidad de negocio.
+                Un usuario sin salones no puede acceder a eventos de una sede.
               </Alert>
             ) : null}
             {state.errors.salonIds ? (
@@ -303,21 +277,6 @@ export function UsuarioForm({
               </FieldError>
             ) : null}
           </div>
-
-          {role === "admin" ? (
-            <Alert>
-              Los administradores tienen acceso global. Al guardar no se
-              mantienen asignaciones de salones para este rol.
-            </Alert>
-          ) : null}
-
-          {role === "ejecutiva_catering" ? (
-            <Alert>
-              Las ejecutivas de catering no se asignan por salon: acceden a
-              cada catering donde figuren como responsable, tenga o no un
-              evento de salon vinculado.
-            </Alert>
-          ) : null}
 
           {mode === "create" ? (
             <Alert>

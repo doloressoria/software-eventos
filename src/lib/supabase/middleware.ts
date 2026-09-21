@@ -35,20 +35,28 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const claims = data?.claims ?? null;
   let accessDenied = false;
+  let isAdmin = false;
+  let permissions: Array<{ can_manage: boolean; screen: string }> = [];
 
   if (claims?.sub) {
     const { data: profile, error } = await supabase
       .from("usuarios")
-      .select("activo")
+      .select("activo, rol")
       .eq("id", claims.sub)
       .maybeSingle();
 
     accessDenied = Boolean(error) || profile?.activo !== true;
+    isAdmin = profile?.rol === "admin";
 
     if (accessDenied) {
       await supabase.auth.signOut({ scope: "local" });
+    } else if (profile?.rol !== "admin") {
+      const { data: permissionData } = await supabase.rpc(
+        "current_user_permissions",
+      );
+      permissions = permissionData ?? [];
     }
   }
 
-  return { accessDenied, claims, response: supabaseResponse };
+  return { accessDenied, claims, isAdmin, permissions, response: supabaseResponse };
 }

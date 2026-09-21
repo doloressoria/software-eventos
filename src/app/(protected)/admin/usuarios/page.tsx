@@ -32,14 +32,14 @@ export default async function UsuariosPage({
 }: UsuariosPageProps) {
   const params = searchParams ? await searchParams : {};
   const filters = getFilters(params);
-  const { salones, totalUsers, users } = await listUsuarios(filters);
+  const { roles, salones, totalUsers, users } = await listUsuarios(filters);
   const statusMessage = params.created
     ? "Usuario creado correctamente."
     : params.updated
       ? "Usuario actualizado correctamente."
       : null;
   const hasFilters = Boolean(
-    filters.search || filters.rol || filters.estado || filters.salonId,
+    filters.search || filters.roleId || filters.estado || filters.salonId,
   );
 
   return (
@@ -55,6 +55,12 @@ export default async function UsuariosPage({
               className={buttonVariants({ variant: "secondary" })}
             >
               Volver al panel
+            </Link>
+            <Link
+              href="/admin/roles"
+              className={buttonVariants({ variant: "secondary" })}
+            >
+              Configurar roles
             </Link>
             <Link
               href="/admin/usuarios/nuevo"
@@ -89,13 +95,12 @@ export default async function UsuariosPage({
               />
             </div>
             <FilterSelect
-              defaultValue={filters.rol}
+              defaultValue={filters.roleId}
               label="Rol"
               name="rol"
               options={[
                 { label: "Todos", value: "todos" },
-                { label: "Administrador", value: "admin" },
-                { label: "Vendedor", value: "vendedor" },
+                ...roles.map((role) => ({ label: role.nombre, value: role.id })),
               ]}
             />
             <FilterSelect
@@ -182,7 +187,7 @@ export default async function UsuariosPage({
                   </TableCell>
                   <TableCell>
                     <Badge variant={user.rol === "admin" ? "primary" : "neutral"}>
-                      {user.rol === "admin" ? "Administrador" : "Vendedor"}
+                      {user.role?.nombre ?? "Sin rol"}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -191,9 +196,13 @@ export default async function UsuariosPage({
                     </Badge>
                   </TableCell>
                   <TableCell className="min-w-56">
-                    {user.rol === "admin" ? (
+                    {user.role?.legacy_rol === "admin" ? (
                       <span className="text-sm text-slate-500">
                         Acceso global
+                      </span>
+                    ) : user.role?.legacy_rol === "ejecutiva_catering" ? (
+                      <span className="text-sm text-slate-500">
+                        Caterings a cargo
                       </span>
                     ) : user.salones.length > 0 ? (
                       <div className="flex max-w-md flex-wrap gap-1.5">
@@ -311,7 +320,7 @@ function getFilters(
   return {
     estado:
       estado === "activo" || estado === "inactivo" ? estado : undefined,
-    rol: rol === "admin" || rol === "vendedor" ? rol : undefined,
+    roleId: rol && rol !== "todos" ? rol : undefined,
     salonId: salon && salon !== "todos" ? salon : undefined,
     search: firstValue(params.search) || undefined,
   };
