@@ -1,9 +1,10 @@
+import { IVA_PORCENTAJE, roundMoney } from "../pagos/calculos";
+
 export type EventoServicioFormFields = {
   servicio_id: string;
   precio_base: string;
   adicionales_monto: string;
   iva_base_imponible: string;
-  iva_porcentaje: string;
   comisiona_organizador: boolean;
   proveedor: string;
   notas: string;
@@ -25,7 +26,6 @@ export type EventoServicioPayload = {
   precio_base: number;
   adicionales_monto: number;
   iva_base_imponible: number;
-  iva_porcentaje: number;
   proveedor: string | null;
   notas: string | null;
   comisiona_organizador: boolean;
@@ -33,21 +33,17 @@ export type EventoServicioPayload = {
   total_con_iva: number;
 };
 
-const IVA_RATE_SCALE = 4;
-
 export function calculateEventoServicioTotals({
   adicionalesMonto,
   ivaBaseImponible,
-  ivaPorcentaje,
   precioBase,
 }: {
   adicionalesMonto: number;
   ivaBaseImponible: number;
-  ivaPorcentaje: number;
   precioBase: number;
 }) {
   const totalSinIva = roundMoney(precioBase + adicionalesMonto);
-  const ivaMonto = roundMoney(ivaBaseImponible * (ivaPorcentaje / 100));
+  const ivaMonto = roundMoney(ivaBaseImponible * IVA_PORCENTAJE);
   const totalConIva = roundMoney(totalSinIva + ivaMonto);
 
   return {
@@ -63,7 +59,6 @@ export function getEmptyEventoServicioFormState(): EventoServicioFormState {
       precio_base: "",
       adicionales_monto: "0",
       iva_base_imponible: "0",
-      iva_porcentaje: "0",
       comisiona_organizador: false,
       proveedor: "",
       notas: "",
@@ -108,10 +103,6 @@ export function validateEventoServicioForm(formData: FormData): {
     "iva_base_imponible",
     errors,
   );
-  const ivaPorcentaje = parseOptionalPercentage(
-    fields.iva_porcentaje,
-    errors,
-  );
 
   if (!servicioId) {
     errors.servicio_id = "Selecciona un servicio.";
@@ -140,8 +131,7 @@ export function validateEventoServicioForm(formData: FormData): {
     !servicioId ||
     precioBase === null ||
     adicionalesMonto === null ||
-    ivaBaseImponible === null ||
-    ivaPorcentaje === null
+    ivaBaseImponible === null
   ) {
     return {
       state: {
@@ -157,10 +147,8 @@ export function validateEventoServicioForm(formData: FormData): {
   const { totalConIva, totalSinIva } = calculateEventoServicioTotals({
     adicionalesMonto,
     ivaBaseImponible,
-    ivaPorcentaje,
     precioBase,
   });
-  const ivaTasa = percentageToRate(ivaPorcentaje);
 
   return {
     state: {
@@ -172,7 +160,6 @@ export function validateEventoServicioForm(formData: FormData): {
     payload: {
       adicionales_monto: adicionalesMonto,
       iva_base_imponible: ivaBaseImponible,
-      iva_porcentaje: ivaTasa,
       comisiona_organizador: fields.comisiona_organizador,
       notas: nullableTrim(fields.notas),
       precio_base: precioBase,
@@ -192,7 +179,6 @@ export function getEventoServicioFields(
     comisiona_organizador:
       formData.get("comisiona_organizador") === "true",
     iva_base_imponible: getString(formData, "iva_base_imponible"),
-    iva_porcentaje: getString(formData, "iva_porcentaje"),
     notas: getString(formData, "notas"),
     precio_base: getString(formData, "precio_base"),
     proveedor: getString(formData, "proveedor"),
@@ -203,7 +189,6 @@ export function getEventoServicioFields(
 export function getEventoServicioFieldsFromValues({
   adicionales_monto,
   iva_base_imponible,
-  iva_porcentaje,
   comisiona_organizador,
   notas,
   precio_base,
@@ -212,7 +197,6 @@ export function getEventoServicioFieldsFromValues({
 }: {
   adicionales_monto: number | null;
   iva_base_imponible: number | null;
-  iva_porcentaje: number | null;
   comisiona_organizador: boolean | null;
   notas: string | null;
   precio_base: number | null;
@@ -223,7 +207,6 @@ export function getEventoServicioFieldsFromValues({
     adicionales_monto: formatFormNumber(adicionales_monto ?? 0),
     comisiona_organizador: comisiona_organizador ?? false,
     iva_base_imponible: formatFormNumber(iva_base_imponible ?? 0),
-    iva_porcentaje: formatFormNumber(rateToPercentage(iva_porcentaje ?? 0)),
     notas: notas ?? "",
     precio_base: precio_base === null ? "" : formatFormNumber(precio_base),
     proveedor: proveedor ?? "",
@@ -275,26 +258,6 @@ function parseOptionalMoney(
   return roundMoney(numberValue);
 }
 
-function parseOptionalPercentage(
-  value: string,
-  errors: EventoServicioFormErrors,
-) {
-  const text = normalizeNumberText(value);
-
-  if (!text) {
-    return 0;
-  }
-
-  const numberValue = Number(text);
-
-  if (!Number.isFinite(numberValue) || numberValue < 0 || numberValue > 100) {
-    errors.iva_porcentaje = "Ingresa un porcentaje entre 0 y 100.";
-    return null;
-  }
-
-  return roundMoney(numberValue);
-}
-
 function getString(formData: FormData, key: string) {
   const value = formData.get(key);
 
@@ -309,24 +272,6 @@ function nullableTrim(value: string) {
   const trimmed = value.trim();
 
   return trimmed || null;
-}
-
-function roundMoney(value: number) {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-}
-
-function percentageToRate(value: number) {
-  return roundToScale(value / 100, IVA_RATE_SCALE);
-}
-
-function rateToPercentage(value: number) {
-  return roundMoney(value * 100);
-}
-
-function roundToScale(value: number, scale: number) {
-  const multiplier = 10 ** scale;
-
-  return Math.round((value + Number.EPSILON) * multiplier) / multiplier;
 }
 
 function formatFormNumber(value: number) {

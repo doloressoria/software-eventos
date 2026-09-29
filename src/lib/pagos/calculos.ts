@@ -1,5 +1,7 @@
 export type EstadoCobro = "pendiente" | "parcial" | "pagado";
 
+export const IVA_PORCENTAJE = 0.21;
+
 export type MoneyRow = {
   deleted_at?: string | null;
   importe_en_pesos: number | null;
@@ -52,6 +54,48 @@ export function sumMoneyRows(rows: MoneyRow[]) {
 
 export function sumOrdinaryPayments(payments: PaymentMoneyRow[]) {
   return sumMoneyRows(getActiveOrdinaryPayments(payments));
+}
+
+export function isNonCashPayment(payment: { forma_pago: string }) {
+  return payment.forma_pago !== "efectivo_pesos";
+}
+
+export function calculateServicioPaymentTotals(
+  payments: (PaymentMoneyRow & { forma_pago: string })[],
+  currentBase: number,
+  totalSinIva: number,
+) {
+  const ordinaryPayments = getActiveOrdinaryPayments(payments);
+  let totalEfectivo = 0;
+  let netoNoEfectivo = 0;
+  let ivaPagadoNoEfectivo = 0;
+
+  for (const payment of ordinaryPayments) {
+    const amount = getMoneyAmount(payment);
+
+    if (!isNonCashPayment(payment)) {
+      totalEfectivo = roundMoney(totalEfectivo + amount);
+      continue;
+    }
+
+    const neto = roundMoney(amount / (1 + IVA_PORCENTAJE));
+    netoNoEfectivo = roundMoney(netoNoEfectivo + neto);
+    ivaPagadoNoEfectivo = roundMoney(
+      ivaPagadoNoEfectivo + roundMoney(amount - neto),
+    );
+  }
+
+  return {
+    ivaBaseImponible: Math.min(
+      totalSinIva,
+      Math.max(currentBase, netoNoEfectivo),
+    ),
+    ivaPagadoNoEfectivo,
+    ivaPorcentaje: IVA_PORCENTAJE,
+    netoNoEfectivo,
+    totalEfectivo,
+    totalPagado: sumOrdinaryPayments(ordinaryPayments),
+  };
 }
 
 export function sumGuarantees(payments: PaymentMoneyRow[]) {

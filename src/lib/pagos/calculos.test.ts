@@ -2,12 +2,146 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { buildReportesFinancieros } from "../reportes/financieros-calculos";
 import {
+  calculateServicioPaymentTotals,
   calculateMoneyFlow,
   calculatePaymentSummary,
+  IVA_PORCENTAJE,
   sumGuarantees,
   sumOrdinaryPayments,
   type PaymentMoneyRow,
 } from "./calculos";
+
+type ServicioPayment = PaymentMoneyRow & { forma_pago: string };
+
+function payment(
+  amount: number,
+  forma_pago = "transferencia",
+  extra: Partial<ServicioPayment> = {},
+): ServicioPayment {
+  return {
+    es_garantia: false,
+    forma_pago,
+    importe_en_pesos: amount,
+    ...extra,
+  };
+}
+
+test("efectivo se imputa completo al neto sin aumentar la base IVA", () => {
+  const totals = calculateServicioPaymentTotals(
+    [payment(605, "efectivo_pesos")],
+    100,
+    1_000,
+  );
+
+  assert.equal(totals.totalEfectivo, 605);
+  assert.equal(totals.netoNoEfectivo, 0);
+  assert.equal(totals.ivaPagadoNoEfectivo, 0);
+  assert.equal(totals.ivaBaseImponible, 100);
+  assert.equal(totals.totalPagado, 605);
+});
+
+test("transferencia, cheque y retenciones separan 21% incluido", () => {
+  for (const forma of ["transferencia", "cheque", "retenciones"]) {
+    const totals = calculateServicioPaymentTotals([payment(605, forma)], 0, 1_000);
+    assert.equal(totals.netoNoEfectivo, 500);
+    assert.equal(totals.ivaPagadoNoEfectivo, 105);
+    assert.equal(totals.totalPagado, 605);
+  }
+  assert.equal(IVA_PORCENTAJE, 0.21);
+});
+
+test("pago no efectivo dentro de la base actual no la cambia", () => {
+  assert.equal(
+    calculateServicioPaymentTotals([payment(605)], 600, 1_000)
+      .ivaBaseImponible,
+    600,
+  );
+});
+
+test("pagos no efectivos acumulados elevan la base sin superar el neto", () => {
+  const payments = [payment(605), payment(363)];
+  const totals = calculateServicioPaymentTotals(payments, 600, 1_000);
+
+  assert.equal(totals.netoNoEfectivo, 800);
+  assert.equal(totals.ivaPagadoNoEfectivo, 168);
+  assert.equal(totals.ivaBaseImponible, 800);
+  assert.equal(totals.totalPagado, 968);
+  assert.equal(
+    calculateServicioPaymentTotals([payment(1_815)], 600, 1_000)
+      .ivaBaseImponible,
+    1_000,
+  );
+});
+
+test("garantias y pagos eliminados no afectan importe ni base", () => {
+  const totals = calculateServicioPaymentTotals(
+    [
+      payment(605, "transferencia", { es_garantia: true }),
+      payment(605, "transferencia", {
+        deleted_at: "2026-09-01T12:00:00Z",
+      }),
+    ],
+    300,
+    1_000,
+  );
+
+  assert.equal(totals.totalPagado, 0);
+  assert.equal(totals.netoNoEfectivo, 0);
+  assert.equal(totals.ivaBaseImponible, 300);
+});
+
+test("eliminar un pago no reduce una base ya aumentada", () => {
+  const before = calculateServicioPaymentTotals([payment(968)], 600, 1_000);
+  const after = calculateServicioPaymentTotals([], before.ivaBaseImponible, 1_000);
+
+  assert.equal(before.ivaBaseImponible, 800);
+  assert.equal(after.ivaBaseImponible, 800);
+  assert.equal(after.totalPagado, 0);
+});
+
+test("un servicio historico con IVA 0 recibe la tasa fija en el nuevo calculo", () => {
+  const historico = {
+    iva_base_imponible: 600,
+    iva_porcentaje: 0,
+    total_sin_iva: 1_000,
+  };
+  const totals = calculateServicioPaymentTotals(
+    [payment(605)],
+    historico.iva_base_imponible,
+    historico.total_sin_iva,
+  );
+
+  assert.equal(totals.ivaPorcentaje, 0.21);
+  assert.equal(totals.ivaBaseImponible, 600);
+  assert.equal(totals.totalPagado, 605);
+});
+
+test("efectivo y transferencia suman todo lo cobrado; solo transferencia eleva IVA", () => {
+  const totals = calculateServicioPaymentTotals(
+    [payment(300, "efectivo_pesos"), payment(605)],
+    400,
+    1_000,
+  );
+
+  assert.equal(totals.totalEfectivo, 300);
+  assert.equal(totals.netoNoEfectivo, 500);
+  assert.equal(totals.ivaPagadoNoEfectivo, 105);
+  assert.equal(totals.ivaBaseImponible, 500);
+  assert.equal(totals.totalPagado, 905);
+});
+
+test("redondea neto e IVA por pago antes de acumular", () => {
+  const totals = calculateServicioPaymentTotals(
+    [payment(0.01), payment(0.02), payment(1)],
+    0,
+    100,
+  );
+
+  assert.equal(totals.netoNoEfectivo, 0.86);
+  assert.equal(totals.ivaPagadoNoEfectivo, 0.17);
+  assert.equal(totals.totalPagado, 1.03);
+  assert.equal(totals.netoNoEfectivo + totals.ivaPagadoNoEfectivo, totals.totalPagado);
+});
 
 const ordinaryPayment: PaymentMoneyRow = {
   es_garantia: false,

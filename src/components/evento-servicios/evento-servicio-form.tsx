@@ -117,9 +117,6 @@ function EventoServicioFormFields({
   const [ivaBaseImponible, setIvaBaseImponible] = useState(
     initialSuggestedFields.iva_base_imponible,
   );
-  const [ivaPorcentaje, setIvaPorcentaje] = useState(
-    initialSuggestedFields.iva_porcentaje,
-  );
   const selectedSuggestion = servicioId
     ? (monthlyPriceSuggestions[servicioId] ?? null)
     : null;
@@ -132,7 +129,6 @@ function EventoServicioFormFields({
     if (suggestion && isFillablePrecioBase(precioBase)) {
       setPrecioBase(formatFormNumber(suggestion.precio_base));
       setIvaBaseImponible(formatFormNumber(suggestion.precio_base));
-      setIvaPorcentaje(formatFormNumber(rateToPercentage(suggestion.iva_porcentaje)));
     }
   }
 
@@ -294,30 +290,7 @@ function EventoServicioFormFields({
               ) : null}
             </div>
 
-            <div>
-              <Label htmlFor={`${formId}-iva_porcentaje`}>IVA %</Label>
-              <Input
-                id={`${formId}-iva_porcentaje`}
-                name="iva_porcentaje"
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
-                value={ivaPorcentaje}
-                onChange={(event) => setIvaPorcentaje(event.target.value)}
-                aria-invalid={Boolean(state.errors.iva_porcentaje)}
-                aria-describedby={
-                  state.errors.iva_porcentaje
-                    ? `${formId}-iva_porcentaje-error`
-                    : undefined
-                }
-              />
-              {state.errors.iva_porcentaje ? (
-                <FieldError id={`${formId}-iva_porcentaje-error`}>
-                  {state.errors.iva_porcentaje}
-                </FieldError>
-              ) : null}
-            </div>
+            <div className="flex items-end text-sm text-slate-600">IVA: 21%</div>
 
             <div className="md:col-span-2">
               <Label htmlFor={`${formId}-notas`}>Notas</Label>
@@ -367,7 +340,6 @@ function getResetSuccessState(
     fields: {
       adicionales_monto: "0",
       iva_base_imponible: "0",
-      iva_porcentaje: "0",
       comisiona_organizador: false,
       notas: "",
       precio_base: "",
@@ -444,20 +416,14 @@ function getSuggestedPriceFields({
   if (!suggestion || !isFillablePrecioBase(fields.precio_base)) {
     return {
       iva_base_imponible: fields.iva_base_imponible,
-      iva_porcentaje: fields.iva_porcentaje,
       precio_base: fields.precio_base,
     };
   }
 
   return {
     iva_base_imponible: formatFormNumber(suggestion.precio_base),
-    iva_porcentaje: formatFormNumber(rateToPercentage(suggestion.iva_porcentaje)),
     precio_base: formatFormNumber(suggestion.precio_base),
   };
-}
-
-function rateToPercentage(value: number) {
-  return Math.round((value * 100 + Number.EPSILON) * 100) / 100;
 }
 
 function formatFormNumber(value: number) {

@@ -9,6 +9,7 @@ import {
   validateEventoServicioForm,
 } from "@/lib/evento-servicios/validation";
 import { getTotalPagadoEventoServicio } from "@/lib/evento-servicios/recalculate-totals";
+import { IVA_PORCENTAJE } from "@/lib/pagos/calculos";
 import { createClient } from "@/lib/supabase/server";
 import { logSupabaseError } from "@/lib/supabase/errors";
 
@@ -58,7 +59,7 @@ export async function createEventoServicioAction(
         evento.tiene_organizador && payload.comisiona_organizador,
       evento_id: evento.id,
       iva_base_imponible: payload.iva_base_imponible,
-      iva_porcentaje: payload.iva_porcentaje,
+      iva_porcentaje: IVA_PORCENTAJE,
       notas: payload.notas,
       precio_base: payload.precio_base,
       proveedor: payload.proveedor,
@@ -127,7 +128,7 @@ export async function updateEventoServicioAction(
       comisiona_organizador:
         evento.tiene_organizador && payload.comisiona_organizador,
       iva_base_imponible: payload.iva_base_imponible,
-      iva_porcentaje: payload.iva_porcentaje,
+      iva_porcentaje: IVA_PORCENTAJE,
       notas: payload.notas,
       precio_base: payload.precio_base,
       proveedor: payload.proveedor,

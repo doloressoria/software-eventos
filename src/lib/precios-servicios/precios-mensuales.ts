@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/server";
 import { logSupabaseError } from "@/lib/supabase/errors";
+import { IVA_PORCENTAJE } from "@/lib/pagos/calculos";
 import type { Enums, Tables, TablesInsert } from "@/types/database.types";
 
 export type ImportPreciosServiciosState = {
@@ -286,7 +287,7 @@ export async function applyMonthlyServicePricesToEvento({
       adicionales_monto: 0,
       evento_id: eventoId,
       iva_base_imponible: precio.precio_base,
-      iva_porcentaje: precio.iva_porcentaje,
+      iva_porcentaje: IVA_PORCENTAJE,
       notas: `Autocompletado desde precios mensuales (${precio.periodLabel}).`,
       precio_base: precio.precio_base,
       servicio_id: servicio.id,
