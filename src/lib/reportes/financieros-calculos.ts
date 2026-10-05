@@ -35,6 +35,7 @@ export type ReportesFinancierosEventoRow = {
   evento: string;
   fecha_evento: string;
   id: string;
+  href: string;
   ingresos_cobrados: number;
   margen_porcentaje: number | null;
   pendiente_cobro: number;
@@ -83,6 +84,7 @@ export type ReporteFinancieroEvento = {
   cliente: string;
   fecha_evento: string;
   id: string;
+  href: string;
   nombre_evento: string;
   salon: string;
   salon_id: string;
@@ -219,6 +221,7 @@ function getFinancierosPorEvento({
         evento: evento.nombre_evento,
         fecha_evento: evento.fecha_evento,
         id: evento.id,
+        href: evento.href,
         ingresos_cobrados,
         margen_porcentaje: getMargenPorcentaje(resultado_neto, ingresos_cobrados),
         pendiente_cobro: getPendienteCobroEstimado(
@@ -314,6 +317,7 @@ function getFinancierosPorVendedor({
   const groups = new Map<string, ReportesFinancierosVendedorRow>();
 
   for (const evento of eventos) {
+    if (!evento.vendedor_id) continue;
     const current = groups.get(evento.vendedor_id) ?? {
       egresos_pagados: 0,
       eventos: 0,

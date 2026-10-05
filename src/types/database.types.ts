@@ -198,6 +198,7 @@ export type Database = {
           id: string
           iva_comision: number | null
           iva_porcentaje: number | null
+          lugar_evento: string | null
           monto_con_factura: number | null
           monto_sin_factura: number | null
           notas: string | null
@@ -239,6 +240,7 @@ export type Database = {
           id?: string
           iva_comision?: number | null
           iva_porcentaje?: number | null
+          lugar_evento?: string | null
           monto_con_factura?: number | null
           monto_sin_factura?: number | null
           notas?: string | null
@@ -280,6 +282,7 @@ export type Database = {
           id?: string
           iva_comision?: number | null
           iva_porcentaje?: number | null
+          lugar_evento?: string | null
           monto_con_factura?: number | null
           monto_sin_factura?: number | null
           notas?: string | null
@@ -1284,6 +1287,21 @@ export type Database = {
           fecha_evento: string | null
           salon_id: string
           salon_nombre: string
+        }[]
+      }
+      catering_buscar_eventos_detalle: {
+        Args: { p_query?: string | null; p_evento_id?: string | null }
+        Returns: {
+          id: string
+          cliente_nombre: string | null
+          fecha_evento: string | null
+          salon_id: string
+          salon_nombre: string
+          tipo_evento: string | null
+          pax_adultos: number | null
+          pax_jovenes: number | null
+          pax_menores: number | null
+          pax_bebes: number | null
         }[]
       }
       catering_evento_existe: { Args: { p_evento_id: string }; Returns: boolean }

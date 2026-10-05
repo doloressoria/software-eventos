@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { KiriaFilters } from "@/components/reportes/kiria-filters";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -97,9 +98,9 @@ export default async function ReportesPage({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
+          <form className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:flex xl:flex-wrap xl:items-end xl:gap-3">
             <input type="hidden" name="tab" value={activeTab} />
-            <div>
+            <div className="xl:min-w-0 xl:flex-[1_1_130px]">
               <Label htmlFor="desde">Desde</Label>
               <DatePickerField
                 id="desde"
@@ -108,7 +109,7 @@ export default async function ReportesPage({
                 placeholder="Desde"
               />
             </div>
-            <div>
+            <div className="xl:min-w-0 xl:flex-[1_1_130px]">
               <Label htmlFor="hasta">Hasta</Label>
               <DatePickerField
                 id="hasta"
@@ -117,27 +118,14 @@ export default async function ReportesPage({
                 placeholder="Hasta"
               />
             </div>
-            <div>
-              <Label htmlFor="salon">Salon</Label>
-              <Select
-                name="salon"
-                defaultValue={reportes.filters.salonId ?? "all"}
-              >
-                <SelectTrigger id="salon">
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {reportes.options.salones.map((salon) => (
-                    <SelectItem key={salon.id} value={salon.id}>
-                      {salon.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <KiriaFilters
+              salones={reportes.options.salones}
+              lugares={reportes.options.lugares}
+              salonInicial={reportes.filters.salonId}
+              lugarInicial={reportes.filters.lugar}
+            />
             {isAdmin ? (
-              <div>
+              <div className="xl:min-w-0 xl:flex-[1_1_130px]">
                 <Label htmlFor="vendedor">Vendedor</Label>
                 <Select
                   name="vendedor"
@@ -157,7 +145,7 @@ export default async function ReportesPage({
                 </Select>
               </div>
             ) : null}
-            <div>
+            <div className="xl:min-w-0 xl:flex-[1_1_130px]">
               <Label htmlFor="estado">Estado</Label>
               <Select
                 name="estado"
@@ -176,7 +164,7 @@ export default async function ReportesPage({
                 </SelectContent>
               </Select>
             </div>
-            <div>
+            <div className="xl:min-w-0 xl:flex-[1_1_130px]">
               <Label htmlFor="evento">Evento</Label>
               <Select
                 name="evento"
@@ -195,7 +183,7 @@ export default async function ReportesPage({
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-end gap-2">
+            <div className="col-span-full ml-auto flex gap-2 xl:shrink-0">
               <button
                 type="submit"
                 className={buttonVariants({ variant: "primary" })}
@@ -218,7 +206,7 @@ export default async function ReportesPage({
       {activeTab === "resumen" ? (
         <dl className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <SummaryCard
-          label="Eventos"
+          label="Eventos y caterings"
           value={formatNumber(reportes.metrics.eventosTotal)}
           helper="Cantidad total del periodo"
         />
@@ -402,7 +390,7 @@ export default async function ReportesPage({
             helper="Registradas aparte del ingreso"
           />
           <SummaryCard
-            label="Eventos incluidos"
+            label="Eventos y caterings incluidos"
             value={formatNumber(financieros.metricas.eventos_incluidos)}
             helper="Segun fecha del evento"
           />
@@ -450,8 +438,8 @@ export default async function ReportesPage({
       {activeTab === "resumen" ? (
         <div className="grid gap-6 xl:grid-cols-2">
         <GroupTable
-          title="Eventos por salon"
-          description="Cantidad de eventos activos agrupados por salon."
+          title="Eventos y caterings por salon"
+          description="Eventos de salon y caterings externos de Kiria."
           emptyTitle="No hay eventos por salon"
           rows={reportes.porSalon}
         />
@@ -474,7 +462,7 @@ export default async function ReportesPage({
         ) : null}
         <Card>
           <CardHeader>
-            <CardTitle>Proximos eventos con saldo pendiente</CardTitle>
+            <CardTitle>Proximos eventos y caterings con saldo pendiente</CardTitle>
             <CardDescription>
               Eventos futuros del periodo con saldo estimado mayor a cero.
             </CardDescription>
@@ -487,7 +475,7 @@ export default async function ReportesPage({
                     <TableHead>Fecha</TableHead>
                     <TableHead>Evento</TableHead>
                     <TableHead>Salon</TableHead>
-                    {isAdmin ? <TableHead>Vendedor</TableHead> : null}
+                    {isAdmin ? <TableHead>Responsable</TableHead> : null}
                     <TableHead className="text-right">Saldo</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -499,7 +487,7 @@ export default async function ReportesPage({
                       </TableCell>
                       <TableCell>
                         <Link
-                          href={`/eventos/${evento.id}/flujo-dinero`}
+                          href={evento.href}
                           className="font-medium text-slate-950 transition hover:text-teal-700"
                         >
                           {evento.cliente}
@@ -1153,7 +1141,7 @@ function FinancialEventTable({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Resultado por evento</CardTitle>
+        <CardTitle>Resultado por evento o catering</CardTitle>
         <CardDescription>
           Detalle comercial por fecha del evento, con cobros reales sin
           garantias.
@@ -1168,7 +1156,7 @@ function FinancialEventTable({
                 <TableHead>Cliente</TableHead>
                 <TableHead>Fecha</TableHead>
                 <TableHead>Salon</TableHead>
-                <TableHead>Vendedor</TableHead>
+                <TableHead>Responsable</TableHead>
                 <TableHead className="text-right">Vendido</TableHead>
                 <TableHead className="text-right">Cobrado</TableHead>
                 <TableHead className="text-right">Egresos</TableHead>
@@ -1183,7 +1171,7 @@ function FinancialEventTable({
                 <TableRow key={row.id}>
                   <TableCell>
                     <Link
-                      href={`/eventos/${row.id}/flujo-dinero`}
+                      href={row.href}
                       className="font-medium text-slate-950 transition hover:text-teal-700"
                     >
                       {row.evento}

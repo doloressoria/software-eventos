@@ -30,6 +30,7 @@ export type CateringListItem = Pick<
   | "fecha_evento"
   | "tipo_evento"
   | "salon_id"
+  | "lugar_evento"
   | "tipo_servicio"
   | "total_con_iva"
   | "saldo_pendiente"
@@ -45,6 +46,7 @@ export type CateringDisplayFields = {
   clienteContacto: string | null;
   fechaEvento: string | null;
   salonNombre: string | null;
+  lugarEvento: string | null;
   tipoEvento: string | null;
 };
 
@@ -58,6 +60,7 @@ export function getCateringDisplayFields(
     | "fecha_evento"
     | "tipo_evento"
     | "evento_id"
+    | "lugar_evento"
   > & {
     eventos?: EventoResumen | null;
     salones?: Pick<Tables<"salones">, "nombre"> | null;
@@ -71,6 +74,7 @@ export function getCateringDisplayFields(
       clienteContacto: catering.eventos.cliente_contacto,
       fechaEvento: catering.eventos.fecha_evento,
       salonNombre: catering.eventos.salones?.nombre ?? null,
+      lugarEvento: null,
       tipoEvento: catering.eventos.tipo_evento,
     };
   }
@@ -81,7 +85,8 @@ export function getCateringDisplayFields(
     clienteCuitDni: catering.cliente_cuit_dni,
     clienteContacto: catering.cliente_contacto,
     fechaEvento: catering.fecha_evento,
-    salonNombre: catering.salones?.nombre ?? null,
+    salonNombre: "Kiria",
+    lugarEvento: catering.lugar_evento,
     tipoEvento: catering.tipo_evento,
   };
 }
@@ -91,7 +96,7 @@ export async function listCaterings() {
   const { data, error } = await supabase
     .from("catering_contratos")
     .select(
-      "id, evento_id, cliente_nombre, cliente_razon_social, cliente_cuit_dni, cliente_contacto, fecha_evento, tipo_evento, salon_id, tipo_servicio, total_con_iva, saldo_pendiente, eventos(cliente_nombre, cliente_razon_social, cliente_cuit_dni, cliente_contacto, fecha_evento, tipo_evento, salones(nombre)), salones(nombre)",
+      "id, evento_id, cliente_nombre, cliente_razon_social, cliente_cuit_dni, cliente_contacto, fecha_evento, tipo_evento, salon_id, lugar_evento, tipo_servicio, total_con_iva, saldo_pendiente, eventos(cliente_nombre, cliente_razon_social, cliente_cuit_dni, cliente_contacto, fecha_evento, tipo_evento, salones(nombre)), salones(nombre)",
     )
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
@@ -106,7 +111,7 @@ export async function listCaterings() {
 
 export async function getNuevoCateringPageData() {
   const supabase = await createClient();
-  const [ejecutivasResult, salonesResult] = await Promise.all([
+  const [ejecutivasResult, lugaresResult] = await Promise.all([
     supabase
       .from("usuarios")
       .select("id, full_name, email")
@@ -114,11 +119,11 @@ export async function getNuevoCateringPageData() {
       .eq("activo", true)
       .order("full_name", { ascending: true }),
     supabase
-      .from("salones")
-      .select("id, nombre")
-      .eq("activo", true)
+      .from("catering_contratos")
+      .select("lugar_evento")
+      .is("evento_id", null)
       .is("deleted_at", null)
-      .order("nombre", { ascending: true }),
+      .not("lugar_evento", "is", null),
   ]);
 
   if (ejecutivasResult.error) {
@@ -126,12 +131,16 @@ export async function getNuevoCateringPageData() {
     throw new Error("No se pudo obtener el listado de ejecutivas de catering.");
   }
 
-  if (salonesResult.error) {
-    logSupabaseError("getNuevoCateringPageData salones", salonesResult.error);
-    throw new Error("No se pudo obtener el listado de salones.");
+  if (lugaresResult.error) {
+    logSupabaseError("getNuevoCateringPageData lugares", lugaresResult.error);
+    throw new Error("No se pudo obtener el listado de lugares.");
   }
 
-  return { ejecutivas: ejecutivasResult.data, salones: salonesResult.data };
+  const lugares = Array.from(new Map(lugaresResult.data
+    .filter((row) => row.lugar_evento?.trim())
+    .map((row) => [row.lugar_evento!.trim().toLocaleLowerCase("es-AR"), row.lugar_evento!.trim()])).values())
+    .sort((a, b) => a.localeCompare(b, "es"));
+  return { ejecutivas: ejecutivasResult.data, lugares };
 }
 
 export type EventoBuscadorResult = {
@@ -140,11 +149,16 @@ export type EventoBuscadorResult = {
   fecha_evento: string | null;
   salon_id: string;
   salon_nombre: string;
+  tipo_evento: string | null;
+  pax_adultos: number | null;
+  pax_jovenes: number | null;
+  pax_menores: number | null;
+  pax_bebes: number | null;
 };
 
 export async function searchEventosParaCatering(query: string) {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("catering_buscar_eventos", {
+  const { data, error } = await supabase.rpc("catering_buscar_eventos_detalle", {
     p_query: query,
   });
 
@@ -158,7 +172,7 @@ export async function searchEventosParaCatering(query: string) {
 
 export async function getEventoBuscadorResultById(eventoId: string) {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("catering_buscar_eventos", {
+  const { data, error } = await supabase.rpc("catering_buscar_eventos_detalle", {
     p_query: "",
     p_evento_id: eventoId,
   });

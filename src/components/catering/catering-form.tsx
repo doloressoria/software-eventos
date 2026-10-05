@@ -32,8 +32,6 @@ import type { EventoBuscadorResult } from "@/lib/catering/queries";
 import type { CateringFormMode, CateringFormState } from "@/lib/catering/validation";
 
 type EjecutivaOption = { id: string; full_name: string; email: string };
-type SalonOption = { id: string; nombre: string };
-
 type CateringFormProps = {
   action: (
     previousState: CateringFormState,
@@ -46,7 +44,7 @@ type CateringFormProps = {
   lockedEvento?: EventoBuscadorResult | null;
   mode: CateringFormMode;
   pendingLabel?: string;
-  salones: SalonOption[];
+  lugares: string[];
   submitLabel?: string;
 };
 
@@ -59,7 +57,7 @@ export function CateringForm({
   lockedEvento = null,
   mode,
   pendingLabel = "Creando...",
-  salones,
+  lugares,
   submitLabel = "Crear catering",
 }: CateringFormProps) {
   const [state, formAction] = useActionState(action, initialState);
@@ -70,6 +68,21 @@ export function CateringForm({
         ? true
         : state.fields.con_evento === "true",
   );
+  const [pax, setPax] = useState(() => ({
+    pax_adultos: state.fields.pax_adultos || (lockedEvento?.pax_adultos?.toString() ?? ""),
+    pax_jovenes: state.fields.pax_jovenes || (lockedEvento?.pax_jovenes?.toString() ?? ""),
+    pax_menores: state.fields.pax_menores || (lockedEvento?.pax_menores?.toString() ?? ""),
+    pax_bebes: state.fields.pax_bebes || (lockedEvento?.pax_bebes?.toString() ?? ""),
+  }));
+
+  function setPaxFromEvento(evento: EventoBuscadorResult) {
+    setPax({
+      pax_adultos: evento.pax_adultos?.toString() ?? "",
+      pax_jovenes: evento.pax_jovenes?.toString() ?? "",
+      pax_menores: evento.pax_menores?.toString() ?? "",
+      pax_bebes: evento.pax_bebes?.toString() ?? "",
+    });
+  }
 
   return (
     <form action={formAction} className="flex max-w-4xl flex-col gap-6" noValidate>
@@ -90,6 +103,7 @@ export function CateringForm({
                 name="evento_id"
                 error={state.errors.evento_id}
                 initialEvento={lockedEvento}
+                onSelect={setPaxFromEvento}
               />
             </div>
           </CardContent>
@@ -125,10 +139,10 @@ export function CateringForm({
               <div className="mt-5">
                 <Label>Evento vinculado</Label>
                 <div className="mt-2">
-                  <EventoPickerField name="evento_id" error={state.errors.evento_id} />
+                  <EventoPickerField name="evento_id" error={state.errors.evento_id} onSelect={setPaxFromEvento} />
                 </div>
                 <p className="mt-2 text-xs text-slate-500">
-                  Cliente, fecha y salon se completan solos desde el evento seleccionado.
+                  Cliente, fecha, salon, tipo y personas se completan desde el evento seleccionado.
                 </p>
               </div>
             ) : null}
@@ -203,19 +217,20 @@ export function CateringForm({
                 ) : null}
               </div>
               <div>
-                <Label htmlFor="salon_id">Salon (si corresponde)</Label>
-                <Select name="salon_id" defaultValue={state.fields.salon_id}>
-                  <SelectTrigger id="salon_id">
-                    <SelectValue placeholder="Sin salon (catering externo)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {salones.map((salon) => (
-                      <SelectItem key={salon.id} value={salon.id}>
-                        {salon.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="lugar_evento">Lugar del evento</Label>
+                <Input
+                  id="lugar_evento"
+                  name="lugar_evento"
+                  list="lugares-catering"
+                  required={mode === "create"}
+                  defaultValue={state.fields.lugar_evento}
+                  aria-invalid={Boolean(state.errors.lugar_evento)}
+                  aria-describedby={state.errors.lugar_evento ? "lugar_evento-error" : undefined}
+                />
+                <datalist id="lugares-catering">
+                  {lugares.map((lugar) => <option key={lugar} value={lugar} />)}
+                </datalist>
+                {state.errors.lugar_evento ? <FieldError id="lugar_evento-error">{state.errors.lugar_evento}</FieldError> : null}
               </div>
               <div>
                 <Label htmlFor="tipo_evento">Tipo de evento</Label>
@@ -294,25 +309,29 @@ export function CateringForm({
             <NumberField
               id="pax_adultos"
               label="Adultos"
-              defaultValue={state.fields.pax_adultos}
+              value={pax.pax_adultos}
+              onChange={(value) => setPax((current) => ({ ...current, pax_adultos: value }))}
               error={state.errors.pax_adultos}
             />
             <NumberField
               id="pax_jovenes"
               label="Jovenes"
-              defaultValue={state.fields.pax_jovenes}
+              value={pax.pax_jovenes}
+              onChange={(value) => setPax((current) => ({ ...current, pax_jovenes: value }))}
               error={state.errors.pax_jovenes}
             />
             <NumberField
               id="pax_menores"
               label="Menores"
-              defaultValue={state.fields.pax_menores}
+              value={pax.pax_menores}
+              onChange={(value) => setPax((current) => ({ ...current, pax_menores: value }))}
               error={state.errors.pax_menores}
             />
             <NumberField
               id="pax_bebes"
               label="Bebes"
-              defaultValue={state.fields.pax_bebes}
+              value={pax.pax_bebes}
+              onChange={(value) => setPax((current) => ({ ...current, pax_bebes: value }))}
               error={state.errors.pax_bebes}
             />
           </div>
@@ -438,12 +457,14 @@ function TextField({
 }
 
 function NumberField({
-  defaultValue,
+  value,
+  onChange,
   error,
   id,
   label,
 }: {
-  defaultValue: string;
+  value: string;
+  onChange: (value: string) => void;
   error?: string;
   id: keyof CateringFormState["fields"];
   label: string;
@@ -459,7 +480,8 @@ function NumberField({
         type="number"
         min="0"
         step="1"
-        defaultValue={defaultValue}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
         aria-invalid={Boolean(error)}
         aria-describedby={error ? errorId : undefined}
       />

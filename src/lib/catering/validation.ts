@@ -1,5 +1,5 @@
-import { isEventoTipo } from "@/lib/eventos/types";
-import type { Tables } from "@/types/database.types";
+import { isEventoTipo } from "../eventos/types";
+import type { Tables } from "../../types/database.types";
 
 export type CateringFormMode = "create" | "edit";
 
@@ -11,7 +11,7 @@ export type CateringFormFields = {
   cliente_cuit_dni: string;
   cliente_contacto: string;
   fecha_evento: string;
-  salon_id: string;
+  lugar_evento: string;
   tipo_evento: string;
   tipo_servicio: string;
   ejecutiva_id: string;
@@ -43,7 +43,7 @@ export type CateringPayload = {
   cliente_cuit_dni: string | null;
   cliente_contacto: string | null;
   fecha_evento: string | null;
-  salon_id: string | null;
+  lugar_evento: string | null;
   tipo_evento: string | null;
   tipo_servicio: string | null;
   ejecutiva_id: string;
@@ -69,7 +69,7 @@ export function getEmptyCateringFormState(): CateringFormState {
       cliente_cuit_dni: "",
       cliente_contacto: "",
       fecha_evento: "",
-      salon_id: "",
+      lugar_evento: "",
       tipo_evento: "",
       tipo_servicio: "",
       ejecutiva_id: "",
@@ -101,7 +101,7 @@ export function getCateringFormStateFromCatering(
       cliente_cuit_dni: catering.cliente_cuit_dni ?? "",
       cliente_contacto: catering.cliente_contacto ?? "",
       fecha_evento: catering.fecha_evento ?? "",
-      salon_id: catering.salon_id ?? "",
+      lugar_evento: catering.lugar_evento ?? "",
       tipo_evento: catering.tipo_evento ?? "",
       tipo_servicio: catering.tipo_servicio ?? "",
       ejecutiva_id: catering.ejecutiva_id ?? "",
@@ -139,7 +139,7 @@ export function validateCateringForm(
 
   let clienteNombre: string | null = null;
   let fechaEvento: string | null = null;
-  let salonId: string | null = null;
+  let lugarEvento: string | null = null;
   let tipoEvento: string | null = null;
   let clienteRazonSocial: string | null = null;
   let clienteCuitDni: string | null = null;
@@ -159,7 +159,7 @@ export function validateCateringForm(
   } else {
     clienteNombre = fields.cliente_nombre.trim() || null;
     fechaEvento = fields.fecha_evento.trim() || null;
-    salonId = fields.salon_id.trim() || null;
+    lugarEvento = fields.lugar_evento.trim() || null;
     tipoEvento = fields.tipo_evento.trim() || null;
     clienteRazonSocial = nullableTrim(fields.cliente_razon_social);
     clienteCuitDni = nullableTrim(fields.cliente_cuit_dni);
@@ -173,6 +173,10 @@ export function validateCateringForm(
       errors.fecha_evento = "Ingresa la fecha del evento.";
     } else if (fechaEvento && !isDateInputValue(fechaEvento)) {
       errors.fecha_evento = "Ingresa una fecha valida.";
+    }
+
+    if (options.mode === "create" && !lugarEvento) {
+      errors.lugar_evento = "Ingresa el lugar del evento.";
     }
 
     if (tipoEvento && !isEventoTipo(tipoEvento)) {
@@ -241,7 +245,7 @@ export function validateCateringForm(
       cliente_cuit_dni: clienteCuitDni,
       cliente_contacto: clienteContacto,
       fecha_evento: fechaEvento,
-      salon_id: salonId,
+      lugar_evento: lugarEvento,
       tipo_evento: tipoEvento,
       tipo_servicio: nullableTrim(tipoServicio),
       ejecutiva_id: ejecutivaId,
@@ -268,7 +272,7 @@ function getCateringFields(formData: FormData): CateringFormFields {
     cliente_cuit_dni: getString(formData, "cliente_cuit_dni"),
     cliente_contacto: getString(formData, "cliente_contacto"),
     fecha_evento: getString(formData, "fecha_evento"),
-    salon_id: getString(formData, "salon_id"),
+    lugar_evento: getString(formData, "lugar_evento"),
     tipo_evento: getString(formData, "tipo_evento"),
     tipo_servicio: getString(formData, "tipo_servicio"),
     ejecutiva_id: getString(formData, "ejecutiva_id"),

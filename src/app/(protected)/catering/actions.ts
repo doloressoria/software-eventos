@@ -91,7 +91,8 @@ export async function createCateringAction(
       cliente_cuit_dni: payload.cliente_cuit_dni,
       cliente_contacto: payload.cliente_contacto,
       fecha_evento: payload.fecha_evento,
-      salon_id: payload.salon_id,
+      lugar_evento: payload.lugar_evento,
+      salon_id: null,
       tipo_evento: payload.tipo_evento,
       tipo_servicio: payload.tipo_servicio,
       ejecutiva_id: payload.ejecutiva_id,
@@ -192,7 +193,7 @@ export async function updateCateringAction(
     updatePayload.cliente_cuit_dni = payload.cliente_cuit_dni;
     updatePayload.cliente_contacto = payload.cliente_contacto;
     updatePayload.fecha_evento = payload.fecha_evento;
-    updatePayload.salon_id = payload.salon_id;
+    updatePayload.lugar_evento = payload.lugar_evento;
     updatePayload.tipo_evento = payload.tipo_evento;
   }
 

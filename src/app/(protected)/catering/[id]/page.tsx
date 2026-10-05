@@ -27,7 +27,7 @@ export default async function CateringDetallePage({
 }: CateringDetallePageProps) {
   const { id } = await params;
   const paramsQuery = searchParams ? await searchParams : {};
-  const [{ catering, items, precioHistorial, precioVigente }, { ejecutivas, salones }] =
+  const [{ catering, items, precioHistorial, precioVigente }, { ejecutivas, lugares }] =
     await Promise.all([getCateringById(id), getNuevoCateringPageData()]);
   const display = getCateringDisplayFields(catering);
   const wasCreated = Boolean(paramsQuery.created);
@@ -78,6 +78,7 @@ export default async function CateringDetallePage({
               <DetailItem label="Contacto" value={display.clienteContacto} />
               <DetailItem label="Fecha del evento" value={formatDate(display.fechaEvento)} />
               <DetailItem label="Salon" value={display.salonNombre ?? "Externo"} />
+              {!catering.evento_id ? <DetailItem label="Lugar" value={display.lugarEvento ?? "Sin especificar"} /> : null}
               <DetailItem label="Tipo de evento" value={display.tipoEvento} />
               <DetailItem label="Tipo de servicio" value={catering.tipo_servicio} />
               {catering.evento_id ? (
@@ -168,7 +169,7 @@ export default async function CateringDetallePage({
             isLinkedToEvento={Boolean(catering.evento_id)}
             mode="edit"
             pendingLabel="Guardando..."
-            salones={salones}
+            lugares={lugares}
             submitLabel="Guardar cambios"
           />
         </CardContent>

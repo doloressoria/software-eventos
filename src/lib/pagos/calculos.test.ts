@@ -246,6 +246,7 @@ test("detalle financiero, flujo y reporte usan el mismo ingreso ordinario", () =
         cliente: "Cliente",
         fecha_evento: "2026-09-01",
         id: "evento-1",
+        href: "/eventos/evento-1/flujo-dinero",
         nombre_evento: "Evento",
         salon: "Salon",
         salon_id: "salon-1",

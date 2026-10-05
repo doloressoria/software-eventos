@@ -33,6 +33,7 @@ export type ReportesGeneralesFilters = {
   eventoId?: string;
   fechaDesde?: string;
   fechaHasta?: string;
+  lugar?: string;
   salonId?: string;
   vendedorId?: string;
 };
@@ -114,6 +115,7 @@ export type ReportesGeneralesPendiente = {
   cliente: string;
   fechaEvento: string;
   id: string;
+  href: string;
   saldoPendiente: number;
   salon: string;
   totalEstimado: number;
@@ -139,6 +141,7 @@ export type ReportesGeneralesData = {
     >[];
     estados: EstadoEvento[];
     salones: Pick<Tables<"salones">, "id" | "nombre">[];
+    lugares: string[];
     vendedores: Pick<Tables<"usuarios">, "id" | "full_name" | "email">[];
   };
   pendientes: ReportesGeneralesPendiente[];
@@ -218,6 +221,16 @@ const ESTADOS_EVENTO: EstadoEvento[] = [
   "realizado",
   "cancelado",
 ];
+const KIRIA_ID = "kiria";
+const SIN_LUGAR = "__sin_lugar__";
+
+type CateringExternoReporte = Pick<
+  Tables<"catering_contratos">,
+  "id" | "cliente_nombre" | "fecha_evento" | "lugar_evento" | "total_con_iva" | "saldo_pendiente"
+>;
+
+type CateringMovimientoPago = Pick<Tables<"pagos">, "catering_contrato_id" | "fecha_pago" | "importe_en_pesos" | "es_garantia">;
+type CateringMovimientoEgreso = Pick<Tables<"egresos">, "catering_contrato_id" | "fecha_egreso" | "importe_en_pesos" | "categoria">;
 
 const ANTICIPACION_RANGOS = [
   { id: "0-30", label: "0 a 30 dias", max: 30, min: 0 },
@@ -232,30 +245,54 @@ export async function getReportesGenerales(
 ): Promise<ReportesGeneralesData> {
   const profile = await getActiveProfile();
   const isAdmin = profile.rol === "admin";
-  const filters = parseFilters(searchParams, isAdmin);
+  const canSeeKiria = isAdmin || profile.rol === "ejecutiva_catering";
+  const filters = parseFilters(searchParams, isAdmin, canSeeKiria);
 
   const [salones, vendedores] = await Promise.all([
     getSalonesOptions(profile),
     isAdmin ? getVendedoresOptions() : Promise.resolve([]),
   ]);
-  const allowedSalonIds = isAdmin ? null : salones.map((salon) => salon.id);
+  const allowedSalonIds = isAdmin || profile.rol === "ejecutiva_catering"
+    ? null
+    : salones.map((salon) => salon.id);
+  const kiria = canSeeKiria ? await getCateringsExternos() : [];
+  const lugares = Array.from(new Map(kiria
+    .filter((row) => row.lugar_evento?.trim())
+    .map((row) => [getLugarKey(row.lugar_evento), row.lugar_evento!.trim()])).values())
+    .sort((a, b) => a.localeCompare(b, "es"));
+  const salonesOptions = canSeeKiria ? [...salones, { id: KIRIA_ID, nombre: "Kiria" }] : salones;
 
   if (allowedSalonIds !== null && allowedSalonIds.length === 0) {
-    return getEmptyReport({ filters, profile, salones, vendedores });
+    return getEmptyReport({ filters, profile, salones: salonesOptions, vendedores, lugares });
   }
 
   if (
     filters.salonId &&
     allowedSalonIds !== null &&
-    !allowedSalonIds.includes(filters.salonId)
+    filters.salonId !== KIRIA_ID && !allowedSalonIds.includes(filters.salonId)
   ) {
-    return getEmptyReport({ filters, profile, salones, vendedores });
+    return getEmptyReport({ filters, profile, salones: salonesOptions, vendedores, lugares });
   }
 
+  const incluirKiria = canSeeKiria && (!filters.salonId || filters.salonId === KIRIA_ID)
+    && !filters.estado && !filters.vendedorId && !filters.eventoId;
+  const kiriaParaMovimientos = incluirKiria
+    ? kiria.filter((row) => !filters.lugar || getLugarKey(row.lugar_evento) === filters.lugar)
+    : [];
+  const externos = incluirKiria
+    ? kiriaParaMovimientos.filter((row) =>
+        (!filters.fechaDesde || (row.fecha_evento ?? "") >= filters.fechaDesde)
+        && (!filters.fechaHasta || (row.fecha_evento ?? "") <= filters.fechaHasta))
+    : [];
+  const { pagos: pagosExternosMovimiento, egresos: egresosExternosMovimiento } = await getMovimientosExternos(kiriaParaMovimientos, filters);
+  const externalIds = new Set(externos.map((row) => row.id));
+  const pagosExternos = pagosExternosMovimiento.filter((row) => row.catering_contrato_id && externalIds.has(row.catering_contrato_id));
+  const egresosExternos = egresosExternosMovimiento.filter((row) => row.catering_contrato_id && externalIds.has(row.catering_contrato_id));
+
   const [eventosResult, pagosMovimientos, egresosMovimientos] = await Promise.all([
-    getEventosReporte({ allowedSalonIds, filters }),
-    getPagosReporte({ allowedSalonIds, filters }),
-    getEgresosReporte({ allowedSalonIds, filters }),
+    filters.salonId === KIRIA_ID ? Promise.resolve([]) : getEventosReporte({ allowedSalonIds, filters }),
+    filters.salonId === KIRIA_ID ? Promise.resolve([]) : getPagosReporte({ allowedSalonIds, filters }),
+    filters.salonId === KIRIA_ID ? Promise.resolve([]) : getEgresosReporte({ allowedSalonIds, filters }),
   ]);
 
   const eventos = eventosResult;
@@ -270,9 +307,27 @@ export async function getReportesGenerales(
       .filter((row) => row.id)
       .map((row) => [row.id as string, row] as const),
   );
-  const totalIngresos = sumIngresosCobrados(pagosMovimientos);
-  const garantiasRegistradas = sumGarantiasRegistradas(pagosMovimientos);
-  const totalEgresos = sumImporteEnPesos(egresosMovimientos);
+  for (const contrato of externos) {
+    resumenByEvento.set(getCateringReportId(contrato.id), {
+      id: getCateringReportId(contrato.id),
+      total_catering: contrato.total_con_iva,
+      total_servicios: 0,
+      saldo_catering: contrato.saldo_pendiente,
+      saldo_servicios: 0,
+    });
+  }
+  const pagosExternosFinancieros = pagosExternos.map((row) => ({
+    ...row, evento_id: getCateringReportId(row.catering_contrato_id!),
+  }));
+  const pagosExternosTodos = pagosExternosMovimiento.map((row) => ({
+    ...row, evento_id: getCateringReportId(row.catering_contrato_id!),
+  }));
+  const egresosExternosFinancieros = egresosExternos.map((row) => ({
+    ...row, evento_id: getCateringReportId(row.catering_contrato_id!),
+  }));
+  const totalIngresos = sumIngresosCobrados([...pagosMovimientos, ...pagosExternosTodos]);
+  const garantiasRegistradas = sumGarantiasRegistradas([...pagosMovimientos, ...pagosExternosTodos]);
+  const totalEgresos = sumImporteEnPesos([...egresosMovimientos, ...egresosExternosMovimiento]);
   const totalEstimadoVendido = roundMoney(
     resumen.reduce(
       (total, row) =>
@@ -280,12 +335,12 @@ export async function getReportesGenerales(
         toMoneyNumber(row.total_catering) +
         toMoneyNumber(row.total_servicios),
       0,
-    ),
+    ) + externos.reduce((total, row) => total + toMoneyNumber(row.total_con_iva), 0),
   );
   const financieros = buildReportesFinancieros({
-    egresos: egresosEventos,
-    eventos: eventos.map(toReporteFinancieroEvento),
-    pagos: pagosEventos,
+    egresos: [...egresosEventos, ...egresosExternosFinancieros],
+    eventos: [...eventos.map(toReporteFinancieroEvento), ...externos.map(toReporteFinancieroCatering)],
+    pagos: [...pagosEventos, ...pagosExternosFinancieros],
     resumenByEvento,
   });
   const saldoPendiente = financieros.metricas.pendiente_cobro;
@@ -295,7 +350,7 @@ export async function getReportesGenerales(
     filters,
     metrics: {
       balanceSimple: roundMoney(totalIngresos - totalEgresos),
-      eventosTotal: eventos.length,
+      eventosTotal: eventos.length + externos.length,
       garantiasRegistradas,
       saldoPendiente,
       totalEgresos,
@@ -310,19 +365,20 @@ export async function getReportesGenerales(
         nombre_evento: evento.nombre_evento,
       })),
       estados: ESTADOS_EVENTO,
-      salones,
+      salones: salonesOptions,
+      lugares,
       vendedores,
     },
-    pendientes: getEventosPendientes(eventos, resumenByEvento, pagosEventos),
+    pendientes: getEventosPendientes(eventos, resumenByEvento, pagosEventos, externos, pagosExternosFinancieros),
     financieros,
     porEstado: groupEventos(eventos, (evento) => ({
       id: evento.estado,
       label: getEstadoLabel(evento.estado),
     })),
-    porSalon: groupEventos(eventos, (evento) => ({
-      id: evento.salon_id,
-      label: evento.salones?.nombre ?? "Salon sin nombre",
-    })),
+    porSalon: [
+      ...groupEventos(eventos, (evento) => ({ id: evento.salon_id, label: evento.salones?.nombre ?? "Salon sin nombre" })),
+      ...(externos.length ? [{ id: KIRIA_ID, label: "Kiria", cantidad: externos.length }] : []),
+    ],
     porVendedor: isAdmin
       ? groupEventos(eventos, (evento) => ({
           id: evento.vendedor_id,
@@ -337,15 +393,19 @@ export async function getReportesGenerales(
 function parseFilters(
   searchParams: ReportesGeneralesSearchParams,
   includeVendedor: boolean,
+  canSeeKiria: boolean,
 ): ReportesGeneralesFilters {
   const estado = getSingleValue(searchParams.estado);
+  const salon = getSingleValue(searchParams.salon);
 
   return {
     estado: isEstadoEvento(estado) ? estado : undefined,
     eventoId: getUuidLikeValue(searchParams.evento),
     fechaDesde: getDateValue(searchParams.desde),
     fechaHasta: getDateValue(searchParams.hasta),
-    salonId: getUuidLikeValue(searchParams.salon),
+    salonId: canSeeKiria && salon === KIRIA_ID ? KIRIA_ID : getUuidLikeValue(searchParams.salon),
+    lugar: canSeeKiria && salon === KIRIA_ID && getSingleValue(searchParams.lugar) !== "all"
+      ? getSingleValue(searchParams.lugar) : undefined,
     vendedorId: includeVendedor
       ? getUuidLikeValue(searchParams.vendedor)
       : undefined,
@@ -400,6 +460,54 @@ async function getVendedoresOptions() {
   }
 
   return data;
+}
+
+async function getCateringsExternos(): Promise<CateringExternoReporte[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("catering_contratos")
+    .select("id, cliente_nombre, fecha_evento, lugar_evento, total_con_iva, saldo_pendiente")
+    .is("evento_id", null)
+    .is("deleted_at", null);
+
+  if (error) {
+    logSupabaseError("getReportesGenerales catering externo", error);
+    throw new Error("No se pudieron obtener los caterings externos del reporte.");
+  }
+  return data;
+}
+
+async function getMovimientosExternos(
+  contratos: CateringExternoReporte[],
+  filters: ReportesGeneralesFilters,
+): Promise<{ pagos: CateringMovimientoPago[]; egresos: CateringMovimientoEgreso[] }> {
+  if (!contratos.length) return { pagos: [], egresos: [] };
+  const supabase = await createClient();
+  // ponytail: IDs travel in the query URL; switch to a joined query if Kiria grows past URL limits.
+  const ids = contratos.map((row) => row.id);
+  const pagosQuery = supabase.from("pagos")
+    .select("catering_contrato_id, fecha_pago, importe_en_pesos, es_garantia")
+    .in("catering_contrato_id", ids).is("deleted_at", null);
+  const egresosQuery = supabase.from("egresos")
+    .select("catering_contrato_id, fecha_egreso, importe_en_pesos, categoria")
+    .in("catering_contrato_id", ids).is("deleted_at", null);
+  applyDateFilters(pagosQuery, filters, "fecha_pago");
+  applyDateFilters(egresosQuery, filters, "fecha_egreso");
+  const [pagos, egresos] = await Promise.all([pagosQuery, egresosQuery]);
+  if (pagos.error || egresos.error) {
+    if (pagos.error) logSupabaseError("getReportesGenerales pagos externos", pagos.error);
+    if (egresos.error) logSupabaseError("getReportesGenerales egresos externos", egresos.error);
+    throw new Error("No se pudieron obtener los movimientos de Kiria.");
+  }
+  return { pagos: pagos.data, egresos: egresos.data };
+}
+
+function getLugarKey(value: string | null) {
+  return value?.trim().toLocaleLowerCase("es-AR") || SIN_LUGAR;
+}
+
+function getCateringReportId(id: string) {
+  return `catering:${id}`;
 }
 
 async function getEventosReporte({
@@ -639,11 +747,13 @@ function getEventosPendientes(
   eventos: ReporteEvento[],
   resumenByEvento: Map<string, ResumenEventoRow>,
   pagos: ReportePago[],
+  externos: CateringExternoReporte[],
+  pagosExternos: ReportePago[],
 ) {
   const today = getTodayInputValue();
   const ingresosByEvento = new Map<string, number>();
 
-  for (const pago of pagos) {
+  for (const pago of [...pagos, ...pagosExternos]) {
     if (!isOrdinaryPayment(pago)) {
       continue;
     }
@@ -656,7 +766,8 @@ function getEventosPendientes(
     );
   }
 
-  return eventos
+  return [
+    ...eventos
     .map((evento) => {
       const resumen = resumenByEvento.get(evento.id);
       const totalEstimado = roundMoney(
@@ -674,13 +785,25 @@ function getEventosPendientes(
         cliente: evento.nombre_evento ?? evento.cliente_nombre,
         fechaEvento: evento.fecha_evento,
         id: evento.id,
+        href: `/eventos/${evento.id}/flujo-dinero`,
         saldoPendiente,
         salon: evento.salones?.nombre ?? "Salon sin nombre",
         totalEstimado,
         vendedor:
           evento.usuarios?.full_name ?? evento.usuarios?.email ?? "Sin vendedor",
       };
-    })
+    }),
+    ...externos.map((contrato) => ({
+      cliente: contrato.cliente_nombre ?? "Cliente sin nombre",
+      fechaEvento: contrato.fecha_evento ?? "",
+      id: getCateringReportId(contrato.id),
+      href: `/catering/${contrato.id}/ingresos`,
+      saldoPendiente: Math.max(roundMoney(toMoneyNumber(contrato.total_con_iva) - (ingresosByEvento.get(getCateringReportId(contrato.id)) ?? 0)), 0),
+      salon: `Kiria · ${contrato.lugar_evento?.trim() || "Sin especificar"}`,
+      totalEstimado: toMoneyNumber(contrato.total_con_iva),
+      vendedor: "Ejecutiva de catering",
+    })),
+  ]
     .filter((evento) => evento.fechaEvento >= today && evento.saldoPendiente > 0)
     .sort((a, b) => a.fechaEvento.localeCompare(b.fechaEvento))
     .slice(0, 8);
@@ -693,12 +816,27 @@ function toReporteFinancieroEvento(
     cliente: evento.cliente_nombre,
     fecha_evento: evento.fecha_evento,
     id: evento.id,
+    href: `/eventos/${evento.id}/flujo-dinero`,
     nombre_evento: evento.nombre_evento ?? evento.cliente_nombre,
     salon: evento.salones?.nombre ?? "Salon sin nombre",
     salon_id: evento.salon_id,
     vendedor:
       evento.usuarios?.full_name ?? evento.usuarios?.email ?? "Sin vendedor",
     vendedor_id: evento.vendedor_id,
+  };
+}
+
+function toReporteFinancieroCatering(contrato: CateringExternoReporte): ReporteFinancieroEvento {
+  return {
+    cliente: contrato.cliente_nombre ?? "Cliente sin nombre",
+    fecha_evento: contrato.fecha_evento ?? "",
+    id: getCateringReportId(contrato.id),
+    href: `/catering/${contrato.id}`,
+    nombre_evento: `Catering · ${contrato.lugar_evento?.trim() || "Sin especificar"}`,
+    salon: "Kiria",
+    salon_id: KIRIA_ID,
+    vendedor: "Ejecutiva de catering",
+    vendedor_id: "",
   };
 }
 
@@ -974,11 +1112,13 @@ function getEmptyReport({
   profile,
   salones,
   vendedores,
+  lugares,
 }: {
   filters: ReportesGeneralesFilters;
   profile: CurrentProfile;
   salones: Pick<Tables<"salones">, "id" | "nombre">[];
   vendedores: Pick<Tables<"usuarios">, "id" | "full_name" | "email">[];
+  lugares: string[];
 }): ReportesGeneralesData {
   return {
     anticipacion: getEmptyAnticipacionReport(),
@@ -996,6 +1136,7 @@ function getEmptyReport({
       eventos: [],
       estados: ESTADOS_EVENTO,
       salones,
+      lugares,
       vendedores,
     },
     pendientes: [],

@@ -10,12 +10,14 @@ type EventoPickerFieldProps = {
   error?: string;
   initialEvento?: EventoBuscadorResult | null;
   name: string;
+  onSelect?: (evento: EventoBuscadorResult) => void;
 };
 
 export function EventoPickerField({
   error,
   initialEvento = null,
   name,
+  onSelect,
 }: EventoPickerFieldProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<EventoBuscadorResult[]>([]);
@@ -43,6 +45,14 @@ export function EventoPickerField({
             </p>
             <p className="mt-1 text-xs text-slate-500">
               {formatDate(selected.fecha_evento)} · {selected.salon_nombre}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              {selected.tipo_evento ?? "Tipo sin especificar"} · {[
+                selected.pax_adultos,
+                selected.pax_jovenes,
+                selected.pax_menores,
+                selected.pax_bebes,
+              ].reduce<number>((sum, pax) => sum + (pax ?? 0), 0)} personas
             </p>
           </div>
           <button
@@ -87,7 +97,10 @@ export function EventoPickerField({
                   <li key={result.id}>
                     <button
                       type="button"
-                      onClick={() => setSelected(result)}
+                      onClick={() => {
+                        setSelected(result);
+                        onSelect?.(result);
+                      }}
                       className="flex w-full flex-col gap-1 px-4 py-3 text-left text-sm transition hover:bg-teal-50/60"
                     >
                       <span className="font-medium text-slate-950">

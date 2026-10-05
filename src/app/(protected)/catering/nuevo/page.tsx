@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { createCateringAction } from "@/app/(protected)/catering/actions";
 import { CateringForm } from "@/components/catering/catering-form";
 import { Alert } from "@/components/ui/alert";
@@ -20,7 +21,7 @@ export default async function NuevoCateringPage({
 }: NuevoCateringPageProps) {
   const params = searchParams ? await searchParams : {};
   const eventoIdParam = getSearchParamValue(params.evento_id);
-  const [{ ejecutivas, salones }, lockedEvento] = await Promise.all([
+  const [{ ejecutivas, lugares }, lockedEvento] = await Promise.all([
     getNuevoCateringPageData(),
     eventoIdParam ? getEventoBuscadorResultById(eventoIdParam) : Promise.resolve(null),
   ]);
@@ -31,7 +32,16 @@ export default async function NuevoCateringPage({
     <section className="space-y-6">
       <PageHeader
         eyebrow="Catering"
-        title="Nuevo catering"
+        title={
+          <Image
+            src="/kiria-catering.png"
+            alt="Kiria Catering"
+            width={722}
+            height={425}
+            priority
+            className="h-auto w-64 max-w-full mix-blend-multiply sm:w-72"
+          />
+        }
         description="Vincula el catering a un evento existente o cargalo como catering externo."
       />
 
@@ -43,7 +53,7 @@ export default async function NuevoCateringPage({
           initialState={getEmptyCateringFormState()}
           lockedEvento={lockedEvento}
           mode="create"
-          salones={salones}
+          lugares={lugares}
         />
       ) : (
         <Card className="max-w-3xl">

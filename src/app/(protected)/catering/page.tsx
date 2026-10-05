@@ -91,6 +91,7 @@ export default async function CateringPage({ searchParams }: CateringPageProps) 
                     </TableCell>
                     <TableCell className="text-slate-600">
                       {display.salonNombre ?? "Externo"}
+                      {display.lugarEvento ? <p className="mt-1 text-sm text-slate-500">{display.lugarEvento}</p> : null}
                     </TableCell>
                     <TableCell className="text-right font-medium text-slate-950">
                       {formatCurrency(catering.total_con_iva)}
