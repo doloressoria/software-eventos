@@ -1,5 +1,6 @@
 import type { Tables, TablesInsert } from "@/types/database.types";
 import { isEventoSubtipoForTipo, isEventoTipo } from "@/lib/eventos/types";
+import { validateContactos, type ContactoInput } from "../contactos/validation";
 
 export type EventoFormMode = "create" | "edit";
 
@@ -38,11 +39,14 @@ export type EventoFormState = {
   fields: EventoFormFields;
   errors: EventoFormErrors;
   formError: string | null;
+  contactos: ContactoInput[];
+  contactosVersion: string;
+  contactosError?: string;
 };
 
 export type EventoPayload = Omit<
   TablesInsert<"eventos">,
-  "fecha_contrato" | "vendedor_id"
+  "fecha_contrato" | "vendedor_id" | "cliente_contacto"
 > & {
   vendedor_id?: string;
 };
@@ -80,10 +84,14 @@ export const emptyEventoFormState: EventoFormState = {
   },
   errors: {},
   formError: null,
+  contactos: [],
+  contactosVersion: "",
 };
 
 export function getEventoFormStateFromEvento(
   evento: Tables<"eventos">,
+  contactos: ContactoInput[] = [],
+  contactosVersion = "",
 ): EventoFormState {
   return {
     fields: {
@@ -117,6 +125,8 @@ export function getEventoFormStateFromEvento(
     },
     errors: {},
     formError: null,
+    contactos,
+    contactosVersion,
   };
 }
 
@@ -131,6 +141,9 @@ export function validateEventoForm(
 } {
   const mode = options.mode ?? "edit";
   const fields = getEventoFields(formData);
+  const contactsResult = validateContactos(formData.get("contactos"));
+  const contactosVersion = typeof formData.get("contactos_version") === "string"
+    ? String(formData.get("contactos_version")) : "";
   if (mode === "create" && !fields.fecha_carga) {
     fields.fecha_carga = getTodayInputValue();
   }
@@ -228,12 +241,15 @@ export function validateEventoForm(
     errors.organizador_email = "Ingresa un email valido.";
   }
 
-  if (Object.keys(errors).length > 0) {
+  if (Object.keys(errors).length > 0 || contactsResult.error) {
     return {
       state: {
         fields,
         errors,
         formError: "Revisa los campos marcados.",
+        contactos: contactsResult.contactos,
+        contactosVersion,
+        contactosError: contactsResult.error ?? undefined,
       },
       payload: null,
     };
@@ -244,6 +260,8 @@ export function validateEventoForm(
       fields,
       errors: {},
       formError: null,
+      contactos: contactsResult.contactos,
+      contactosVersion,
     },
     payload: {
       salon_id: salonId,
@@ -256,7 +274,6 @@ export function validateEventoForm(
       cliente_direccion_factura: nullableTrim(
         fields.cliente_direccion_factura,
       ),
-      cliente_contacto: nullableTrim(fields.cliente_contacto),
       fecha_evento: fechaEvento,
       fecha_carga: fechaCarga || getTodayInputValue(),
       fecha_confirmacion_presupuesto: fechaConfirmacionPresupuesto || null,

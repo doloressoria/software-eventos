@@ -358,7 +358,7 @@ export async function addCateringItemAction(
     categoria: payload.categoria,
     descripcion: payload.descripcion,
     precio_unitario: payload.precio_unitario,
-    total: payload.precio_unitario,
+    pax: 1,
   });
 
   if (error) {
@@ -424,6 +424,14 @@ export async function createCateringPagoAction(
   _previousState: PagoFormState,
   formData: FormData,
 ): Promise<PagoFormState> {
+  return saveCateringPago(cateringId, null, formData);
+}
+
+export async function updateCateringPagoAction(cateringId: string, pagoId: string, _state: PagoFormState, formData: FormData): Promise<PagoFormState> {
+  return saveCateringPago(cateringId, pagoId, formData);
+}
+
+async function saveCateringPago(cateringId: string, pagoId: string | null, formData: FormData): Promise<PagoFormState> {
   const profile = await getCurrentProfile();
 
   if (!profile?.activo) {
@@ -443,30 +451,38 @@ export async function createCateringPagoAction(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("pagos").insert({
+  const values = {
     catering_contrato_id: cateringId,
     evento_id: current.evento_id,
     concepto: payload.concepto,
-    es_garantia: false,
+    es_garantia: payload.es_garantia,
     fecha_pago: payload.fecha_pago,
     forma_pago: payload.forma_pago,
     importe_moneda_original: payload.monto,
-    moneda: "ARS",
+    moneda: payload.moneda,
+    tipo_cambio: payload.tipo_cambio,
+    banco: payload.banco,
+    numero_cheque: payload.numero_cheque,
     notas: payload.notas,
-    registrado_por: profile.id,
-  });
+  };
+  const mutation = pagoId
+    ? supabase.from("pagos").update(values).eq("id", pagoId).eq("catering_contrato_id", cateringId).is("deleted_at", null)
+    : supabase.from("pagos").insert({ ...values, registrado_por: profile.id });
+  const { data, error } = await mutation.select("id").maybeSingle();
 
   if (error) {
     logSupabaseError("createCateringPagoAction insertar", error);
     return { ...state, formError: "No se pudo registrar el pago. Intenta nuevamente." };
   }
 
+  if (!data) return { ...state, formError: NOT_FOUND_ERROR };
+
   await recalculateCateringTotals(cateringId);
   revalidateCateringPaths(cateringId, current.evento_id);
 
   return {
-    ...getEmptyPagoFormState(),
-    successMessage: "Pago registrado correctamente.",
+    ...(pagoId ? state : getEmptyPagoFormState()),
+    successMessage: pagoId ? "Pago actualizado correctamente." : "Pago registrado correctamente.",
   };
 }
 
@@ -636,9 +652,12 @@ function revalidateCateringPaths(cateringId: string, eventoId: string | null) {
   revalidatePath("/catering");
   revalidatePath(`/catering/${cateringId}`);
   revalidatePath(`/catering/${cateringId}/ingresos`);
+  revalidatePath("/reportes", "layout");
   revalidatePath(`/catering/${cateringId}/egresos`);
 
   if (eventoId) {
     revalidatePath(`/eventos/${eventoId}`);
+    revalidatePath(`/eventos/${eventoId}/ingresos`);
+    revalidatePath(`/eventos/${eventoId}/flujo-dinero`);
   }
 }

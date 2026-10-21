@@ -31,7 +31,7 @@ import { EVENT_TYPES } from "@/lib/eventos/types";
 import type { EventoBuscadorResult } from "@/lib/catering/queries";
 import type { CateringFormMode, CateringFormState } from "@/lib/catering/validation";
 
-type EjecutivaOption = { id: string; full_name: string; email: string };
+type EjecutivaOption = { id: string; full_name: string | null; email: string };
 type CateringFormProps = {
   action: (
     previousState: CateringFormState,
@@ -284,7 +284,7 @@ export function CateringForm({
                 <SelectContent>
                   {ejecutivas.map((ejecutiva) => (
                     <SelectItem key={ejecutiva.id} value={ejecutiva.id}>
-                      {ejecutiva.full_name} - {ejecutiva.email}
+                      {ejecutiva.full_name ?? "Sin nombre"} - {ejecutiva.email}
                     </SelectItem>
                   ))}
                 </SelectContent>

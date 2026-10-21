@@ -1,3 +1,4 @@
+import { PagoImporte } from "@/components/pagos/pago-importe";
 import Link from "next/link";
 import { EventoDetalleNav } from "@/components/eventos/evento-detalle-nav";
 import { Badge } from "@/components/ui/badge";
@@ -184,7 +185,7 @@ export default async function EventoFlujoDineroPage({
                       />
                     </TableCell>
                     <TableCell className="text-right font-medium text-slate-950">
-                      {formatCurrency(getMontoPesos(pago))}
+                      <PagoImporte pago={pago} />
                     </TableCell>
                   </TableRow>
                 ))}

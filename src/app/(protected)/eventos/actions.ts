@@ -17,6 +17,7 @@ import {
 import { generateEventoName } from "@/lib/eventos/types";
 import { applyMonthlyServicePricesToEvento } from "@/lib/precios-servicios/precios-mensuales";
 import { requireScreenManagement } from "@/lib/roles/access";
+import { contactosPayload } from "@/lib/contactos/validation";
 import type { Tables, TablesUpdate } from "@/types/database.types";
 
 type EditableEvento = Tables<"eventos">;
@@ -111,20 +112,15 @@ export async function createEventoAction(
     };
   }
 
-  const { data, error } = await supabase
-    .from("eventos")
-    .insert({
-      ...payload,
-      fecha_carga: getTodayInputValue(),
-      nombre_evento: nombreEvento,
-      vendedor_id: vendedorId,
-      estado: "borrador",
-    })
-    .select("created_at, id")
-    .single();
+  const { data: eventoId, error } = await supabase.rpc("guardar_evento_con_contactos", {
+    p_datos: { ...payload, fecha_carga: getTodayInputValue(), nombre_evento: nombreEvento,
+      vendedor_id: vendedorId, estado: "borrador" },
+    p_contactos: contactosPayload(state.contactos),
+    p_version: state.contactosVersion,
+  });
+  const data = eventoId ? { id: eventoId } : null;
 
-  if (error) {
-    logSupabaseError("createEventoAction insertar evento", error);
+  if (error || !data) {
     return {
       ...state,
       formError: "No se pudo crear el evento. Intenta nuevamente.",
@@ -135,6 +131,7 @@ export async function createEventoAction(
     eventoId: data.id,
   });
 
+  revalidatePath("/catering", "layout");
   revalidatePath("/eventos");
   revalidatePath(`/eventos/${data.id}`);
   redirect(getEventoRedirectUrl(data.id, "created", priceResult));
@@ -213,7 +210,6 @@ export async function updateEventoAction(
     cliente_direccion: payload.cliente_direccion,
     cliente_ciudad: payload.cliente_ciudad,
     cliente_direccion_factura: payload.cliente_direccion_factura,
-    cliente_contacto: payload.cliente_contacto,
     fecha_evento: payload.fecha_evento,
     fecha_carga: payload.fecha_carga,
     fecha_confirmacion_presupuesto: payload.fecha_confirmacion_presupuesto,
@@ -231,7 +227,6 @@ export async function updateEventoAction(
     organizador_email: payload.organizador_email,
     organizador_telefono: payload.organizador_telefono,
     observaciones: payload.observaciones,
-    updated_at: new Date().toISOString(),
   };
 
   if (profile.rol === "admin") {
@@ -239,19 +234,17 @@ export async function updateEventoAction(
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("eventos")
-    .update(updatePayload)
-    .eq("id", id)
-    .is("deleted_at", null)
-    .select("id")
-    .maybeSingle();
+  const { data, error } = await supabase.rpc("guardar_evento_con_contactos", {
+    p_evento_id: id, p_datos: updatePayload,
+    p_contactos: contactosPayload(state.contactos), p_version: state.contactosVersion,
+  });
 
   if (error) {
-    logSupabaseError("updateEventoAction actualizar evento", error);
     return {
       ...state,
-      formError: "No se pudo actualizar el evento. Intenta nuevamente.",
+      formError: error.code === "40001"
+        ? "Los contactos cambiaron. Recargá y revisá antes de guardar. No se modificó el evento."
+        : "No se pudo guardar el evento y sus contactos. Tus cambios siguen en el formulario.",
     };
   }
 
@@ -263,32 +256,11 @@ export async function updateEventoAction(
     };
   }
 
-  if (!payload.tiene_organizador) {
-    const { error: serviciosError } = await supabase
-      .from("evento_servicios")
-      .update({
-        comisiona_organizador: false,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("evento_id", id);
-
-    if (serviciosError) {
-      logSupabaseError(
-        "updateEventoAction desmarcar comisiona organizador",
-        serviciosError,
-      );
-      return {
-        ...state,
-        formError:
-          "El evento se actualizo, pero no se pudieron desmarcar los servicios que comisionan.",
-      };
-    }
-  }
-
   const priceResult = await applyMonthlyServicePricesToEvento({
     eventoId: id,
   });
 
+  revalidatePath("/catering", "layout");
   revalidatePath("/eventos");
   revalidatePath(`/eventos/${id}`);
   revalidatePath(`/eventos/${id}/editar`);
@@ -354,6 +326,7 @@ export async function deleteEventoAction(
     };
   }
 
+  revalidatePath("/catering", "layout");
   revalidatePath("/eventos");
   revalidatePath(`/eventos/${id}`);
   redirect("/eventos?deleted=1");

@@ -220,3 +220,15 @@ test("incluye catering externo en Kiria sin atribuirlo a un vendedor", () => {
   assert.equal(reporte.porEvento[0].href, "/catering/contrato-1");
   assert.equal(reporte.porVendedor.length, 0);
 });
+
+test("consolida USD a cotizaciones históricas y ARS usando sólo sus equivalentes", () => {
+  const pagos = [
+    { importe_moneda_original: 100, moneda: "USD", tipo_cambio: 1200, importe_en_pesos: 120000 },
+    { importe_moneda_original: 100, moneda: "USD", tipo_cambio: 1300, importe_en_pesos: 130000 },
+    { importe_moneda_original: 500, moneda: "ARS", tipo_cambio: 1, importe_en_pesos: 500 },
+  ].map(p => ({ ...p, es_garantia: false, evento_id: "evento-1", fecha_pago: "2026-06-01" }));
+  const reporte = buildReportesFinancieros({ eventos, resumenByEvento, egresos: [], pagos: [...pagos, { ...pagos[0], es_garantia: true }] });
+  assert.equal(reporte.metricas.ingresos_cobrados, 250500);
+  assert.equal(reporte.porEvento[0].ingresos_cobrados, 250500);
+  assert.equal(reporte.metricas.garantias_registradas, 120000);
+});

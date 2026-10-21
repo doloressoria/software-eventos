@@ -1,4 +1,7 @@
-import { createPagoAction, deletePagoAction } from "@/app/(protected)/pagos/actions";
+import { updateCateringPagoAction } from "@/app/(protected)/catering/actions";
+import { CateringPagoForm } from "@/components/catering/catering-pago-form";
+import { PagoImporte } from "@/components/pagos/pago-importe";
+import { createPagoAction, deletePagoAction, updatePagoAction } from "@/app/(protected)/pagos/actions";
 import { DeletePagoForm } from "@/components/pagos/delete-pago-form";
 import { PagoForm } from "@/components/pagos/pago-form";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getEmptyPagoFormState } from "@/lib/pagos/validation";
+import { getEmptyPagoFormState, getPagoEditState } from "@/lib/pagos/validation";
 import type { EventoIngresos, EstadoCobro } from "@/lib/pagos/queries";
 import type { EventoServicioPagoOption } from "@/lib/evento-servicios/queries";
 
@@ -71,7 +74,7 @@ export function IngresosEventoSection({
                   <TableHead>Concepto</TableHead>
                   <TableHead>Servicio</TableHead>
                   <TableHead>Forma</TableHead>
-                  <TableHead className="text-right">Monto</TableHead>
+                  <TableHead className="text-right">Importe y equivalente ARS</TableHead>
                   <TableHead>Notas</TableHead>
                   <TableHead className="text-right">Accion</TableHead>
                 </TableRow>
@@ -94,15 +97,18 @@ export function IngresosEventoSection({
                     </TableCell>
                     <TableCell>{getFormaPagoLabel(pago.forma_pago)}</TableCell>
                     <TableCell className="text-right font-medium text-slate-950">
-                      {formatCurrency(
-                        pago.importe_en_pesos ??
-                          pago.importe_moneda_original,
-                      )}
+                      <PagoImporte pago={pago} />
                     </TableCell>
                     <TableCell className="max-w-xs text-slate-500">
                       {pago.notas ?? "-"}
                     </TableCell>
                     <TableCell className="text-right">
+                      <details className="mb-3 text-left">
+                        <summary className="cursor-pointer text-sm">Editar pago</summary>
+                        <div className="min-w-72 p-3">
+                          {pago.catering_contrato_id ? <CateringPagoForm editing action={updateCateringPagoAction.bind(null, pago.catering_contrato_id, pago.id)} initialState={getPagoEditState(pago)} /> : <PagoForm editing action={updatePagoAction.bind(null, eventoId, pago.id)} initialState={getPagoEditState(pago)} servicios={servicios} />}
+                        </div>
+                      </details>
                       <DeletePagoForm
                         action={deletePagoAction.bind(
                           null,

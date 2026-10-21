@@ -441,6 +441,7 @@ function getCategoriaServicioLabel(value: Enums<"categoria_servicio">) {
     sadaic: "SADAIC",
     salon: "Salon",
     sillas_tiffany: "Sillas Tiffany",
+    tecnica: "Técnica",
     varios: "Varios",
   };
 

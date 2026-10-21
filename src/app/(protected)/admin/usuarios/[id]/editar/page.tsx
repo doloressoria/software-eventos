@@ -22,7 +22,7 @@ export default async function EditarUsuarioPage({
     fields: {
       activo: user.activo,
       email: user.email,
-      fullName: user.full_name,
+      fullName: user.full_name ?? "",
       roleId,
       salonIds,
     },
@@ -35,7 +35,7 @@ export default async function EditarUsuarioPage({
     <section className="space-y-6">
       <PageHeader
         eyebrow="Admin / Usuarios"
-        title={`Editar ${user.full_name}`}
+        title={`Editar ${user.full_name ?? user.email}`}
         description="Los cambios de email y estado se sincronizan con Supabase Auth y el perfil de la aplicacion."
         actions={
           <div className="flex flex-wrap items-center gap-3">

@@ -17,6 +17,7 @@ export type FlujoPago = Pick<
   | "es_garantia"
   | "evento_servicio_id"
   | "fecha_pago"
+  | "tipo_cambio"
   | "forma_pago"
   | "id"
   | "importe_en_pesos"
@@ -145,7 +146,7 @@ export async function getEventoFlujoDinero(
     supabase
       .from("pagos")
       .select(
-        "id, catering_contrato_id, concepto, created_at, es_garantia, evento_servicio_id, fecha_pago, forma_pago, importe_en_pesos, importe_moneda_original, moneda, notas",
+        "id, catering_contrato_id, concepto, created_at, es_garantia, evento_servicio_id, fecha_pago, forma_pago, tipo_cambio, importe_en_pesos, importe_moneda_original, moneda, notas",
       )
       .eq("evento_id", evento.id)
       .is("deleted_at", null)

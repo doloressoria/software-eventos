@@ -27,6 +27,14 @@ export async function createPagoAction(
   _previousState: PagoFormState,
   formData: FormData,
 ): Promise<PagoFormState> {
+  return savePago(eventoId, null, formData);
+}
+
+export async function updatePagoAction(eventoId: string, pagoId: string, _state: PagoFormState, formData: FormData): Promise<PagoFormState> {
+  return savePago(eventoId, pagoId, formData);
+}
+
+async function savePago(eventoId: string, pagoId: string | null, formData: FormData): Promise<PagoFormState> {
   const profile = await getCurrentProfile();
 
   if (!profile?.activo) {
@@ -63,22 +71,29 @@ export async function createPagoAction(
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("pagos")
-    .insert({
-      concepto: payload.concepto,
-      es_garantia: false,
-      evento_id: evento.id,
-      evento_servicio_id: eventoServicioId,
-      fecha_pago: payload.fecha_pago,
-      forma_pago: payload.forma_pago,
-      importe_moneda_original: payload.monto,
-      moneda: "ARS",
-      notas: payload.notas,
-      registrado_por: profile.id,
-    })
-    .select("id")
-    .maybeSingle();
+  const previous = pagoId ? await supabase.from("pagos").select("evento_servicio_id")
+    .eq("id", pagoId).eq("evento_id", evento.id).is("catering_contrato_id", null)
+    .is("deleted_at", null).maybeSingle() : null;
+  if (pagoId && (!previous?.data || previous.error)) return { ...state, formError: CREATE_PAGO_ERROR };
+  const values = {
+    concepto: payload.concepto,
+    es_garantia: payload.es_garantia,
+    evento_id: evento.id,
+    evento_servicio_id: eventoServicioId,
+    fecha_pago: payload.fecha_pago,
+    forma_pago: payload.forma_pago,
+    importe_moneda_original: payload.monto,
+    moneda: payload.moneda,
+    tipo_cambio: payload.tipo_cambio,
+    banco: payload.banco,
+    numero_cheque: payload.numero_cheque,
+    notas: payload.notas,
+  };
+  const mutation = pagoId
+    ? supabase.from("pagos").update(values).eq("id", pagoId).eq("evento_id", evento.id)
+      .is("catering_contrato_id", null).is("deleted_at", null)
+    : supabase.from("pagos").insert({ ...values, registrado_por: profile.id });
+  const { data, error } = await mutation.select("id").maybeSingle();
 
   if (error) {
     logSupabaseError("createPagoAction insertar pago", error);
@@ -95,7 +110,10 @@ export async function createPagoAction(
     };
   }
 
-  await setEventoFechaContratoIfMissing(evento.id, payload.fecha_pago);
+  if (!pagoId) await setEventoFechaContratoIfMissing(evento.id, payload.fecha_pago);
+  if (previous?.data?.evento_servicio_id && previous.data.evento_servicio_id !== eventoServicioId) {
+    await recalculateEventoServicioTotals(previous.data.evento_servicio_id);
+  }
 
   if (eventoServicioId) {
     await recalculateEventoServicioTotals(eventoServicioId);
@@ -104,8 +122,8 @@ export async function createPagoAction(
   revalidateEventoPaths(evento.id);
 
   return {
-    ...getEmptyPagoFormState(),
-    successMessage: "Pago registrado correctamente.",
+    ...(pagoId ? state : getEmptyPagoFormState()),
+    successMessage: pagoId ? "Pago actualizado correctamente." : "Pago registrado correctamente.",
   };
 }
 
@@ -197,7 +215,7 @@ async function getEventoServicioConMayorSaldo(eventoId: string) {
     supabase
       .from("pagos")
       .select(
-        "es_garantia, evento_servicio_id, importe_en_pesos, importe_moneda_original",
+        "es_garantia, evento_servicio_id, importe_en_pesos, importe_moneda_original, moneda",
       )
       .eq("evento_id", eventoId)
       .is("deleted_at", null)
@@ -276,4 +294,6 @@ function revalidateEventoPaths(eventoId: string) {
   revalidatePath("/eventos");
   revalidatePath(`/eventos/${eventoId}`);
   revalidatePath(`/eventos/${eventoId}/ingresos`);
+  revalidatePath(`/eventos/${eventoId}/flujo-dinero`);
+  revalidatePath("/reportes", "layout");
 }

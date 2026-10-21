@@ -16,6 +16,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { getEventoById } from "@/lib/eventos/queries";
 import { getEventoValores } from "@/lib/evento-servicios/queries";
 import { getEventoCaterings } from "@/lib/catering/queries";
+import { getEventoContactos } from "@/lib/contactos/queries";
+import { ContactosSection } from "@/components/eventos/contactos-section";
 
 type EventoDetallePageProps = {
   params: Promise<{
@@ -31,9 +33,10 @@ export default async function EventoDetallePage({
   const { id } = await params;
   const paramsQuery = searchParams ? await searchParams : {};
   const { evento } = await getEventoById(id);
-  const [valores, caterings] = await Promise.all([
+  const [valores, caterings, contactos] = await Promise.all([
     getEventoValores(evento.id),
     getEventoCaterings(evento.id),
+    getEventoContactos(evento.id),
   ]);
   const wasCreated = Boolean(paramsQuery.created);
   const wasUpdated = Boolean(paramsQuery.updated);
@@ -177,7 +180,6 @@ export default async function EventoDetallePage({
               value={evento.cliente_razon_social}
             />
             <DetailItem label="CUIT / DNI" value={evento.cliente_cuit_dni} />
-            <DetailItem label="Contacto" value={evento.cliente_contacto} />
             <DetailItem label="Direccion" value={evento.cliente_direccion} />
             <DetailItem label="Ciudad" value={evento.cliente_ciudad} />
             <DetailItem
@@ -187,6 +189,8 @@ export default async function EventoDetallePage({
           </dl>
         </CardContent>
       </Card>
+
+      <ContactosSection eventoId={evento.id} initial={contactos} />
 
       <Card>
         <CardHeader>

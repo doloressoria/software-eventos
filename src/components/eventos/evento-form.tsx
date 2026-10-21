@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
 import { SubmitButton } from "@/components/salones/submit-button";
+import { ContactoAnterior, ContactosFields } from "./contactos-fields";
 import { Alert } from "@/components/ui/alert";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -283,11 +284,6 @@ export function EventoForm({
               id="cliente_cuit_dni"
               label="CUIT / DNI"
               defaultValue={state.fields.cliente_cuit_dni}
-            />
-            <TextField
-              id="cliente_contacto"
-              label="Contacto"
-              defaultValue={state.fields.cliente_contacto}
             />
             <TextField
               id="cliente_direccion"
@@ -574,6 +570,17 @@ export function EventoForm({
               error={state.errors.pax_bebes}
             />
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className={mode === "create" ? "order-4" : undefined}>
+        <CardHeader>
+          <CardTitle>Contactos del evento</CardTitle>
+          <CardDescription>Se guardan junto con el evento y se comparten con su catering asociado.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <ContactoAnterior value={initialState.fields.cliente_contacto} />
+          <ContactosFields initial={state.contactos} version={state.contactosVersion} error={state.contactosError} />
         </CardContent>
       </Card>
 

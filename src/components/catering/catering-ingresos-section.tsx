@@ -1,6 +1,8 @@
+import { PagoImporte } from "@/components/pagos/pago-importe";
 import {
   createCateringPagoAction,
   deleteCateringPagoAction,
+  updateCateringPagoAction,
 } from "@/app/(protected)/catering/actions";
 import { CateringPagoForm } from "@/components/catering/catering-pago-form";
 import { DeleteCateringPagoForm } from "@/components/catering/delete-catering-pago-form";
@@ -22,7 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { CateringIngresos, EstadoCobro } from "@/lib/catering/pagos-queries";
-import { getEmptyPagoFormState } from "@/lib/pagos/validation";
+import { getEmptyPagoFormState, getPagoEditState } from "@/lib/pagos/validation";
 
 type CateringIngresosSectionProps = {
   cateringId: string;
@@ -67,7 +69,7 @@ export function CateringIngresosSection({
                   <TableHead>Fecha</TableHead>
                   <TableHead>Concepto</TableHead>
                   <TableHead>Forma</TableHead>
-                  <TableHead className="text-right">Monto</TableHead>
+                  <TableHead className="text-right">Importe y equivalente ARS</TableHead>
                   <TableHead>Notas</TableHead>
                   <TableHead className="text-right">Accion</TableHead>
                 </TableRow>
@@ -86,12 +88,16 @@ export function CateringIngresosSection({
                     </TableCell>
                     <TableCell>{getFormaPagoLabel(pago.forma_pago)}</TableCell>
                     <TableCell className="text-right font-medium text-slate-950">
-                      {formatCurrency(pago.importe_en_pesos ?? pago.importe_moneda_original)}
+                      <PagoImporte pago={pago} />
                     </TableCell>
                     <TableCell className="max-w-xs text-slate-500">
                       {pago.notas ?? "-"}
                     </TableCell>
                     <TableCell className="text-right">
+                      <details className="mb-3 text-left">
+                        <summary className="cursor-pointer text-sm">Editar pago</summary>
+                        <div className="min-w-72 p-3"><CateringPagoForm editing action={updateCateringPagoAction.bind(null, cateringId, pago.id)} initialState={getPagoEditState(pago)} /></div>
+                      </details>
                       <DeleteCateringPagoForm
                         action={deleteCateringPagoAction.bind(null, cateringId, pago.id)}
                       />

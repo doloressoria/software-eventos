@@ -11,6 +11,7 @@ export const AUDIT_ACTIONS = [
   "UNASSIGN",
 ] as const satisfies readonly Enums<"accion_audit">[];
 export const AUDITED_TABLES = [
+  "evento_contactos",
   "eventos",
   "evento_servicios",
   "pagos",

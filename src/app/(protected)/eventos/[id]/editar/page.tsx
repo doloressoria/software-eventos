@@ -3,6 +3,7 @@ import { EventoForm } from "@/components/eventos/evento-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { getEditarEventoPageData } from "@/lib/eventos/queries";
 import { getEventoFormStateFromEvento } from "@/lib/eventos/validation";
+import { getEventoContactos } from "@/lib/contactos/queries";
 
 type EditarEventoPageProps = {
   params: Promise<{
@@ -17,6 +18,7 @@ export default async function EditarEventoPage({
   const { assignments, evento, profile, salones, vendedores } =
     await getEditarEventoPageData(id);
   const isAdmin = profile.rol === "admin";
+  const contactos = await getEventoContactos(id);
 
   return (
     <section className="space-y-6">
@@ -30,7 +32,7 @@ export default async function EditarEventoPage({
         action={updateEventoAction.bind(null, evento.id)}
         assignments={assignments}
         cancelHref={`/eventos/${evento.id}`}
-        initialState={getEventoFormStateFromEvento(evento)}
+        initialState={getEventoFormStateFromEvento(evento, contactos.contactos, contactos.version)}
         isAdmin={isAdmin}
         mode="edit"
         pendingLabel="Guardando..."

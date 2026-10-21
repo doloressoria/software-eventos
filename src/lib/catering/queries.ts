@@ -10,7 +10,6 @@ type EventoResumen = Pick<
   | "cliente_nombre"
   | "cliente_razon_social"
   | "cliente_cuit_dni"
-  | "cliente_contacto"
   | "fecha_evento"
   | "tipo_evento"
 > & {
@@ -71,7 +70,7 @@ export function getCateringDisplayFields(
       clienteNombre: catering.eventos.cliente_nombre,
       clienteRazonSocial: catering.eventos.cliente_razon_social,
       clienteCuitDni: catering.eventos.cliente_cuit_dni,
-      clienteContacto: catering.eventos.cliente_contacto,
+      clienteContacto: null,
       fechaEvento: catering.eventos.fecha_evento,
       salonNombre: catering.eventos.salones?.nombre ?? null,
       lugarEvento: null,
@@ -96,7 +95,7 @@ export async function listCaterings() {
   const { data, error } = await supabase
     .from("catering_contratos")
     .select(
-      "id, evento_id, cliente_nombre, cliente_razon_social, cliente_cuit_dni, cliente_contacto, fecha_evento, tipo_evento, salon_id, lugar_evento, tipo_servicio, total_con_iva, saldo_pendiente, eventos(cliente_nombre, cliente_razon_social, cliente_cuit_dni, cliente_contacto, fecha_evento, tipo_evento, salones(nombre)), salones(nombre)",
+      "id, evento_id, cliente_nombre, cliente_razon_social, cliente_cuit_dni, cliente_contacto, fecha_evento, tipo_evento, salon_id, lugar_evento, tipo_servicio, total_con_iva, saldo_pendiente, eventos(cliente_nombre, cliente_razon_social, cliente_cuit_dni, fecha_evento, tipo_evento, salones(nombre)), salones(nombre)",
     )
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
@@ -257,7 +256,7 @@ export async function getCateringById(id: string) {
     supabase
       .from("catering_contratos")
       .select(
-        "*, eventos(cliente_nombre, cliente_razon_social, cliente_cuit_dni, cliente_contacto, fecha_evento, tipo_evento, salones(nombre)), salones(nombre), usuarios!catering_contratos_ejecutiva_id_fkey(full_name, email)",
+        "*, eventos(cliente_nombre, cliente_razon_social, cliente_cuit_dni, fecha_evento, tipo_evento, salones(nombre)), salones(nombre), usuarios!catering_contratos_ejecutiva_id_fkey(full_name, email)",
       )
       .eq("id", id)
       .is("deleted_at", null)

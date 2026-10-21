@@ -15,6 +15,8 @@ import {
   getNuevoCateringPageData,
 } from "@/lib/catering/queries";
 import { getCateringFormStateFromCatering } from "@/lib/catering/validation";
+import { getEventoContactos } from "@/lib/contactos/queries";
+import { ContactosSection } from "@/components/eventos/contactos-section";
 
 type CateringDetallePageProps = {
   params: Promise<{ id: string }>;
@@ -30,6 +32,7 @@ export default async function CateringDetallePage({
   const [{ catering, items, precioHistorial, precioVigente }, { ejecutivas, lugares }] =
     await Promise.all([getCateringById(id), getNuevoCateringPageData()]);
   const display = getCateringDisplayFields(catering);
+  const contactos = catering.evento_id ? await getEventoContactos(catering.evento_id) : null;
   const wasCreated = Boolean(paramsQuery.created);
   const paxTotal =
     (catering.pax_adultos ?? 0) +
@@ -75,7 +78,7 @@ export default async function CateringDetallePage({
               <DetailItem label="Cliente" value={display.clienteNombre} />
               <DetailItem label="Razon social" value={display.clienteRazonSocial} />
               <DetailItem label="CUIT / DNI" value={display.clienteCuitDni} />
-              <DetailItem label="Contacto" value={display.clienteContacto} />
+              {!catering.evento_id ? <DetailItem label="Contacto" value={display.clienteContacto} /> : null}
               <DetailItem label="Fecha del evento" value={formatDate(display.fechaEvento)} />
               <DetailItem label="Salon" value={display.salonNombre ?? "Externo"} />
               {!catering.evento_id ? <DetailItem label="Lugar" value={display.lugarEvento ?? "Sin especificar"} /> : null}
@@ -114,6 +117,8 @@ export default async function CateringDetallePage({
           </CardContent>
         </Card>
       </div>
+
+      {contactos && catering.evento_id ? <ContactosSection eventoId={catering.evento_id} initial={contactos} /> : null}
 
       <Card>
         <CardHeader>

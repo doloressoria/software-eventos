@@ -150,6 +150,32 @@ pnpm supabase:types
 
 The generated types are written to `src/types/database.types.ts`.
 
+The command replaces the type file only after successful generation.
+
+## Focused Payment Verification
+
+See [verification findings and application procedure](docs/verificacion-bloqueos.md)
+before applying the payment/security migration. The reference schema is not a
+replacement for the live database, and this checkout lacks the historical baseline
+needed for a full local reset.
+
+`pnpm test` runs unit tests. `pnpm test:db` runs the focused payment suite in a
+temporary PostgreSQL 17 cluster with fictional records, real RLS and triggers.
+It requires `initdb`, `pg_ctl` and `psql` in PATH, or `PG_BIN` pointing to their
+directory. It never connects to the shared database and needs neither Docker nor
+a full schema rebuild.
+
+## Event Contacts
+
+See [contacts and staging verification](docs/contactos-y-staging.md) for the
+separate contacts migration, permissions, legacy-text transition and deployment
+order. Apply the database migrations before deploying this UI.
+
+`pnpm test:contactos:db` uses the same temporary PostgreSQL runner to test contacts,
+including rollback and concurrent changes of the primary contact. It requires
+PostgreSQL 17 binaries in PATH or the `PG_BIN` directory, and never connects to
+the shared database.
+
 ## Monthly Service Prices Excel
 
 Admins can import monthly service prices from `/admin/precios-servicios`.
@@ -188,3 +214,28 @@ route placeholders and migration scaffolding. The production schema and business
 logic still need validation before implementation.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+### Pagos en dólares con cotización manual
+
+Los ingresos de eventos y catering admiten efectivo y transferencia en ARS/USD;
+los saldos y reportes siguen en ARS. Cada pago conserva su cotización histórica.
+La implementación requiere la migración `20261021155412_payments_manual_usd.sql`
+después de las correcciones previas de pagos y contactos. Consultar
+[orden de SQL, verificación y pruebas de interfaz](docs/pagos-usd.md) antes de
+aplicar cambios; no usar push/reset global con el baseline incompleto.
+
+```bash
+PG_BIN=/opt/homebrew/opt/postgresql@17/bin pnpm test:usd:db
+```
+
+El comando prueba datos ficticios en PostgreSQL efímero y no acepta una conexión
+remota. No sustituye el recorrido HTTP con Auth real en staging.
+
+### Publicación del 2026-10-21
+
+Ver [registro de aplicación y verificaciones](docs/publicacion-20261021.md).
+Las tres migraciones de pagos/contactos/USD fueron aplicadas al proyecto configurado
+antes de publicar la UI. Los tipos de `public` se regeneraron contra la base final
+con la herramienta oficial MCP, comprobando que el resultado fuera completo.
+Conservar las anotaciones de columnas generadas como `never` y el argumento nullable
+de creación de roles al regenerarlos: esas restricciones no las expresa el generador.

@@ -15,6 +15,9 @@ export type PagoCatering = Pick<
   | "id"
   | "importe_en_pesos"
   | "importe_moneda_original"
+  | "tipo_cambio"
+  | "banco"
+  | "numero_cheque"
   | "moneda"
   | "notas"
 >;
@@ -35,7 +38,7 @@ export async function getCateringIngresos(
     supabase
       .from("pagos")
       .select(
-        "id, concepto, created_at, es_garantia, fecha_pago, forma_pago, importe_en_pesos, importe_moneda_original, moneda, notas",
+        "id, concepto, created_at, es_garantia, fecha_pago, forma_pago, importe_en_pesos, importe_moneda_original, moneda, tipo_cambio, banco, numero_cheque, notas",
       )
       .eq("catering_contrato_id", cateringContratoId)
       .is("deleted_at", null)

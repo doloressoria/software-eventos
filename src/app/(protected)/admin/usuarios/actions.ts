@@ -352,7 +352,7 @@ async function rollbackAuthUser({
 }: {
   activo: boolean;
   email: string;
-  fullName: string;
+  fullName: string | null;
   id: string;
   metadata: Record<string, unknown>;
 }) {

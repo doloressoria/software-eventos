@@ -51,6 +51,7 @@ type PagoServicioRow = Pick<
   | "evento_servicio_id"
   | "importe_en_pesos"
   | "importe_moneda_original"
+  | "moneda"
 >;
 
 type EventoServicioRow = Omit<
@@ -84,7 +85,7 @@ export async function getEventoValores(eventoId: string) {
     supabase
       .from("pagos")
       .select(
-        "es_garantia, evento_servicio_id, importe_en_pesos, importe_moneda_original",
+        "es_garantia, evento_servicio_id, importe_en_pesos, importe_moneda_original, moneda",
       )
       .eq("evento_id", eventoId)
       .is("deleted_at", null)
@@ -153,6 +154,7 @@ export function getCategoriaServicioLabel(value: Enums<"categoria_servicio">) {
     sadaic: "SADAIC",
     salon: "Salon",
     sillas_tiffany: "Sillas Tiffany",
+    tecnica: "Técnica",
     varios: "Varios",
   };
 

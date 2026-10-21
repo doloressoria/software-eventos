@@ -32,7 +32,7 @@ export async function recalculateEventoServicioTotals(
   const { data: pagos, error: pagosError } = await supabase
     .from("pagos")
     .select(
-      "es_garantia, forma_pago, importe_en_pesos, importe_moneda_original",
+      "es_garantia, forma_pago, importe_en_pesos, importe_moneda_original, moneda",
     )
     .eq("evento_servicio_id", eventoServicioId)
     .is("deleted_at", null);
@@ -71,7 +71,7 @@ export async function getTotalPagadoEventoServicio(
   const { data, error } = await supabase
     .from("pagos")
     .select(
-      "es_garantia, importe_en_pesos, importe_moneda_original",
+      "es_garantia, importe_en_pesos, importe_moneda_original, moneda",
     )
     .eq("evento_servicio_id", eventoServicioId)
     .is("deleted_at", null);

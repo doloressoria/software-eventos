@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useId } from "react";
 import { SubmitButton } from "@/components/salones/submit-button";
 import { DatePickerField } from "@/components/ui/date-picker-field";
 import {
@@ -17,10 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  pagoFormaPagoOptions,
-  type PagoFormState,
-} from "@/lib/pagos/validation";
+import type { PagoFormState } from "@/lib/pagos/validation";
+import { PagoMoneyFields } from "@/components/pagos/pago-money-fields";
 import type { EventoServicioPagoOption } from "@/lib/evento-servicios/queries";
 
 type PagoFormProps = {
@@ -29,119 +27,71 @@ type PagoFormProps = {
     formData: FormData,
   ) => Promise<PagoFormState>;
   initialState: PagoFormState;
-  servicios: EventoServicioPagoOption[];
+  servicios?: EventoServicioPagoOption[];
+  editing?: boolean;
 };
 
-export function PagoForm({ action, initialState, servicios }: PagoFormProps) {
+export function PagoForm({ action, initialState, servicios, editing = false }: PagoFormProps) {
   const [state, formAction] = useActionState(action, initialState);
+  const id = useId();
   const formRef = useRef<HTMLFormElement>(null);
-  const formaPagoValue = state.successMessage
-    ? initialState.fields.forma_pago
-    : state.fields.forma_pago;
-  const fechaPagoValue = state.successMessage
+  const fechaPagoValue = state.successMessage && !editing
     ? initialState.fields.fecha_pago
     : state.fields.fecha_pago;
-  const eventoServicioValue = state.successMessage
-    ? "sin_asociar"
+  const eventoServicioValue = state.successMessage && !editing
+    ? initialState.fields.evento_servicio_id || "sin_asociar"
     : state.fields.evento_servicio_id || "sin_asociar";
 
   useEffect(() => {
-    if (state.successMessage) {
+    if (state.successMessage && !editing) {
       formRef.current?.reset();
     }
-  }, [state.successMessage]);
+  }, [state.successMessage, editing]);
 
   return (
     <form ref={formRef} action={formAction} className="space-y-5" noValidate>
       <div className="grid gap-5 md:grid-cols-2">
-        <div>
-          <Label htmlFor="monto">Monto cobrado</Label>
-          <Input
-            id="monto"
-            name="monto"
-            type="number"
-            min="0.01"
-            step="0.01"
-            required
-            defaultValue={state.fields.monto}
-            aria-invalid={Boolean(state.errors.monto)}
-            aria-describedby={state.errors.monto ? "monto-error" : undefined}
-          />
-          {state.errors.monto ? (
-            <FieldError id="monto-error">{state.errors.monto}</FieldError>
-          ) : null}
-        </div>
+        <PagoMoneyFields key={JSON.stringify([state.fields, state.successMessage])} state={state} />
 
         <div>
-          <Label htmlFor="fecha_pago">Fecha de pago</Label>
+          <Label htmlFor={`${id}-fecha_pago`}>Fecha de pago</Label>
           <DatePickerField
             key={`fecha-pago-${fechaPagoValue}`}
-            id="fecha_pago"
+            id={`${id}-fecha_pago`}
             name="fecha_pago"
             required
             defaultValue={fechaPagoValue}
             aria-invalid={Boolean(state.errors.fecha_pago)}
             aria-describedby={
-              state.errors.fecha_pago ? "fecha_pago-error" : undefined
+              state.errors.fecha_pago ? `${id}-fecha_pago-error` : undefined
             }
           />
           {state.errors.fecha_pago ? (
-            <FieldError id="fecha_pago-error">
+            <FieldError id={`${id}-fecha_pago-error`}>
               {state.errors.fecha_pago}
             </FieldError>
           ) : null}
         </div>
 
         <div>
-          <Label htmlFor="forma_pago">Forma de pago</Label>
-          <Select
-            name="forma_pago"
-            required
-            defaultValue={formaPagoValue}
-            key={`forma-${formaPagoValue}`}
-          >
-            <SelectTrigger
-              id="forma_pago"
-              aria-invalid={Boolean(state.errors.forma_pago)}
-              aria-describedby={
-                state.errors.forma_pago ? "forma_pago-error" : undefined
-              }
-            >
-              <SelectValue placeholder="Seleccionar forma de pago" />
-            </SelectTrigger>
-            <SelectContent>
-              {pagoFormaPagoOptions.map((option) => (
-                <SelectItem key={option} value={option}>
-                  {getFormaPagoLabel(option)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {state.errors.forma_pago ? (
-            <FieldError id="forma_pago-error">
-              {state.errors.forma_pago}
-            </FieldError>
-          ) : null}
-        </div>
-
-        <div>
-          <Label htmlFor="concepto">Concepto</Label>
+          <Label htmlFor={`${id}-concepto`}>Concepto</Label>
           <Input
-            id="concepto"
+            id={`${id}-concepto`}
             name="concepto"
             type="text"
             defaultValue={state.fields.concepto}
           />
         </div>
 
+        {servicios && (
         <div className="md:col-span-2">
-          <Label htmlFor="evento_servicio_id">Servicio asociado</Label>
+          <Label htmlFor={`${id}-evento_servicio_id`}>Servicio asociado</Label>
           <Select
             name="evento_servicio_id"
             defaultValue={eventoServicioValue}
             key={`servicio-${eventoServicioValue}`}
           >
-            <SelectTrigger id="evento_servicio_id">
+            <SelectTrigger id={`${id}-evento_servicio_id`}>
               <SelectValue placeholder="Asignar automaticamente" />
             </SelectTrigger>
             <SelectContent>
@@ -156,11 +106,12 @@ export function PagoForm({ action, initialState, servicios }: PagoFormProps) {
             </SelectContent>
           </Select>
         </div>
+        )}
 
         <div className="md:col-span-2">
-          <Label htmlFor="notas">Notas</Label>
+          <Label htmlFor={`${id}-notas`}>Notas</Label>
           <Textarea
-            id="notas"
+            id={`${id}-notas`}
             name="notas"
             rows={3}
             defaultValue={state.fields.notas}
@@ -175,22 +126,11 @@ export function PagoForm({ action, initialState, servicios }: PagoFormProps) {
 
       <div className="flex justify-end">
         <SubmitButton pendingLabel="Registrando...">
-          Registrar pago
+          {editing ? "Guardar cambios" : "Registrar pago"}
         </SubmitButton>
       </div>
     </form>
   );
-}
-
-function getFormaPagoLabel(value: string) {
-  const labels: Record<string, string> = {
-    cheque: "Cheque",
-    efectivo_pesos: "Efectivo pesos",
-    retenciones: "Retenciones",
-    transferencia: "Transferencia",
-  };
-
-  return labels[value] ?? value;
 }
 
 function formatCurrency(value: number) {

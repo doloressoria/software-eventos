@@ -57,7 +57,7 @@ export function sumOrdinaryPayments(payments: PaymentMoneyRow[]) {
 }
 
 export function isNonCashPayment(payment: { forma_pago: string }) {
-  return payment.forma_pago !== "efectivo_pesos";
+  return !["efectivo_pesos", "efectivo_dolares"].includes(payment.forma_pago);
 }
 
 export function calculateServicioPaymentTotals(

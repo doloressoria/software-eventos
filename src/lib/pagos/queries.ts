@@ -10,6 +10,7 @@ export type { EstadoCobro } from "@/lib/pagos/calculos";
 
 export type PagoEvento = Pick<
   Tables<"pagos">,
+  | "catering_contrato_id"
   | "concepto"
   | "created_at"
   | "es_garantia"
@@ -19,6 +20,9 @@ export type PagoEvento = Pick<
   | "id"
   | "importe_en_pesos"
   | "importe_moneda_original"
+  | "tipo_cambio"
+  | "banco"
+  | "numero_cheque"
   | "moneda"
   | "notas"
 > & {
@@ -43,7 +47,7 @@ export async function getEventoIngresos(
     supabase
       .from("pagos")
       .select(
-        "id, concepto, created_at, es_garantia, evento_servicio_id, fecha_pago, forma_pago, importe_en_pesos, importe_moneda_original, moneda, notas, evento_servicios(servicios_catalogo(nombre))",
+        "id, catering_contrato_id, concepto, created_at, es_garantia, evento_servicio_id, fecha_pago, forma_pago, importe_en_pesos, importe_moneda_original, moneda, tipo_cambio, banco, numero_cheque, notas, evento_servicios(servicios_catalogo(nombre))",
       )
       .eq("evento_id", eventoId)
       .is("deleted_at", null)

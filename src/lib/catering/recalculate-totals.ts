@@ -29,7 +29,7 @@ export async function recalculateCateringTotals(cateringContratoId: string) {
         .eq("catering_contrato_id", cateringContratoId),
       supabase
         .from("pagos")
-        .select("es_garantia, importe_en_pesos, importe_moneda_original")
+        .select("es_garantia, importe_en_pesos, importe_moneda_original, moneda")
         .eq("catering_contrato_id", cateringContratoId)
         .is("deleted_at", null),
     ]);
@@ -86,7 +86,6 @@ export async function recalculateCateringTotals(cateringContratoId: string) {
     subtotal + ivaSubtotal + comisionMonto + comisionIvaMonto,
   );
   const totalPagado = sumOrdinaryPayments(pagosResult.data);
-  const saldoPendiente = Math.max(roundMoney(totalConIva - totalPagado), 0);
 
   const { error } = await supabase
     .from("catering_contratos")
@@ -94,7 +93,6 @@ export async function recalculateCateringTotals(cateringContratoId: string) {
       total_sin_iva: totalSinIva,
       total_con_iva: totalConIva,
       total_pagado: totalPagado,
-      saldo_pendiente: saldoPendiente,
       updated_at: new Date().toISOString(),
     })
     .eq("id", cateringContratoId);
