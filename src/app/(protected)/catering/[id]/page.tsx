@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ExportExcelButton, ExportExcelScope } from "@/components/commercial-export";
 import { deleteCateringAction, updateCateringAction } from "@/app/(protected)/catering/actions";
 import { CateringDetalleNav } from "@/components/catering/catering-detalle-nav";
 import { CateringForm } from "@/components/catering/catering-form";
@@ -41,7 +42,7 @@ export default async function CateringDetallePage({
     (catering.pax_bebes ?? 0);
 
   return (
-    <section className="space-y-6">
+    <ExportExcelScope className="space-y-6">
       <PageHeader
         eyebrow="Catering"
         title={display.clienteNombre}
@@ -52,6 +53,7 @@ export default async function CateringDetallePage({
         }
         actions={
           <>
+            <ExportExcelButton kind="catering" id={catering.id} />
             <DeleteCateringForm action={deleteCateringAction.bind(null, catering.id)} />
             <Link href="/catering" className={buttonVariants({ variant: "secondary" })}>
               Volver a catering
@@ -179,7 +181,7 @@ export default async function CateringDetallePage({
           />
         </CardContent>
       </Card>
-    </section>
+    </ExportExcelScope>
   );
 }
 

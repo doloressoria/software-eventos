@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
+import { useExportForm } from "@/components/commercial-export";
 import {
   addCateringItemAction,
   deleteCateringItemAction,
@@ -45,7 +46,7 @@ type CateringItemsSectionProps = {
 };
 
 export function CateringItemsSection({ cateringId, items }: CateringItemsSectionProps) {
-  const [state, formAction] = useActionState(
+  const [state, formAction, pending] = useActionState(
     addCateringItemAction.bind(null, cateringId),
     getEmptyCateringItemFormState(),
   );
@@ -57,6 +58,7 @@ export function CateringItemsSection({ cateringId, items }: CateringItemsSection
       formRef.current?.reset();
     }
   }, [state.successMessage]);
+  useExportForm(formRef, pending, Boolean(state.successMessage), state);
 
   return (
     <Card>

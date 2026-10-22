@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState, type RefObject } from "react";
+import { useExportForm } from "@/components/commercial-export";
 import { SubmitButton } from "@/components/salones/submit-button";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -57,7 +58,9 @@ export function EventoServicioForm({
   submittingLabel,
   variant = "edit",
 }: EventoServicioFormProps) {
-  const [state, formAction] = useActionState(action, initialState);
+  const [state, formAction, pending] = useActionState(action, initialState);
+  const formRef = useRef<HTMLFormElement>(null);
+  useExportForm(formRef, pending, Boolean(state.successMessage), state);
   const renderedState =
     resetOnSuccess && state.successMessage
       ? getResetSuccessState(state.successMessage)
@@ -69,6 +72,7 @@ export function EventoServicioForm({
       catalogo={catalogo}
       eventoId={eventoId}
       formAction={formAction}
+      formRef={formRef}
       formId={formId}
       monthlyPriceSuggestions={monthlyPriceSuggestions}
       state={renderedState}
@@ -84,6 +88,7 @@ function EventoServicioFormFields({
   catalogo,
   eventoId,
   formAction,
+  formRef,
   formId,
   monthlyPriceSuggestions,
   state,
@@ -95,6 +100,7 @@ function EventoServicioFormFields({
   catalogo: ServicioCatalogoOption[];
   eventoId?: string;
   formAction: (formData: FormData) => void;
+  formRef: RefObject<HTMLFormElement | null>;
   formId: string;
   monthlyPriceSuggestions: MonthlyServicePriceSuggestions;
   state: EventoServicioFormState;
@@ -138,7 +144,7 @@ function EventoServicioFormFields({
   const isCateringSelected = variant === "create" && selectedCategoria === "catering";
 
   return (
-    <form action={formAction} className="space-y-5" noValidate>
+    <form ref={formRef} action={formAction} className="space-y-5" noValidate>
       <div className="grid gap-5 md:grid-cols-2">
         <div>
           <Label htmlFor={`${formId}-servicio_id`}>Servicio</Label>

@@ -176,6 +176,19 @@ including rollback and concurrent changes of the primary contact. It requires
 PostgreSQL 17 binaries in PATH or the `PG_BIN` directory, and never connects to
 the shared database.
 
+## Commercial Detail Excel Export
+
+Event and catering details include **Exportar a Excel**. Downloads use the saved
+commercial detail and independent screen/record permissions. Services and catering
+remain separate when their charges cannot be proven independent. Differences
+between stored totals and the current breakdown are labeled explicitly.
+
+See [mapping, financial sources and verification](docs/exportacion-comercial-excel.md).
+Run `pnpm excel:examples` to regenerate the five fictional examples in
+`outputs/commercial-excel/`. Private templates under `resources/commercial-excel/`
+are included by the Next.js server trace; the original customer workbooks must
+remain outside the repository and `public`.
+
 ## Monthly Service Prices Excel
 
 Admins can import monthly service prices from `/admin/precios-servicios`.

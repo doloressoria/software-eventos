@@ -11,6 +11,7 @@
 # testing
 /coverage
 /.test-build
+/.excel-example-build
 
 # next.js
 /.next/

@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  outputFileTracingIncludes: {
+    "/eventos/*/excel": ["./resources/commercial-excel/evento.xlsx"],
+    "/catering/*/excel": ["./resources/commercial-excel/catering.xlsx"],
+  },
 };
 
 export default nextConfig;

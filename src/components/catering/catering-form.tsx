@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
+import { useExportForm } from "@/components/commercial-export";
 import { EventoPickerField } from "@/components/catering/evento-picker-field";
 import { SubmitButton } from "@/components/salones/submit-button";
 import { buttonVariants } from "@/components/ui/button";
@@ -60,7 +61,9 @@ export function CateringForm({
   lugares,
   submitLabel = "Crear catering",
 }: CateringFormProps) {
-  const [state, formAction] = useActionState(action, initialState);
+  const [state, formAction, pending] = useActionState(action, initialState);
+  const formRef = useRef<HTMLFormElement>(null);
+  useExportForm(formRef, pending, !state.formError && Object.keys(state.errors).length === 0 && state !== initialState, state);
   const [conEvento, setConEvento] = useState(
     mode === "edit"
       ? isLinkedToEvento
@@ -85,7 +88,7 @@ export function CateringForm({
   }
 
   return (
-    <form action={formAction} className="flex max-w-4xl flex-col gap-6" noValidate>
+    <form ref={formRef} action={formAction} className="flex max-w-4xl flex-col gap-6" noValidate>
       {mode === "create" && lockedEvento ? (
         <Card>
           <CardHeader>

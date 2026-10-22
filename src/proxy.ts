@@ -7,6 +7,17 @@ export async function proxy(request: NextRequest) {
   const isPublicRoute = pathname === "/login";
   const { accessDenied, claims, isAdmin, permissions, response } = await updateSession(request);
   const isAuthenticated = Boolean(claims);
+  const isExcelDownload = /^\/(eventos|catering)\/[^/]+\/excel$/.test(pathname);
+  if (isExcelDownload) {
+    const permission = getRequiredScreenPermission(pathname);
+    const status = !isAuthenticated ? 401 : accessDenied || (!isAdmin && !permissions.some((p) => p.screen === permission?.screen)) ? 403 : null;
+    if (status) {
+      const denied = NextResponse.json({ error: status === 401 ? "La sesión venció. Volvé a iniciar sesión para descargar el archivo." : "No tenés permiso para exportar este detalle." },
+        { status, headers: { "Cache-Control": "private, no-store", "Vary": "Cookie" } });
+      response.cookies.getAll().forEach((cookie) => denied.cookies.set(cookie.name, cookie.value, cookie));
+      return denied;
+    }
+  }
 
   if (accessDenied) {
     const redirectResponse = NextResponse.redirect(

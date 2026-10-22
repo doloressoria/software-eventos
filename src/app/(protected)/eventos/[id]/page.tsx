@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ExportExcelButton, ExportExcelScope } from "@/components/commercial-export";
 import { deleteEventoAction } from "@/app/(protected)/eventos/actions";
 import { EventoDetalleNav } from "@/components/eventos/evento-detalle-nav";
 import { DeleteEventoForm } from "@/components/eventos/delete-evento-form";
@@ -47,13 +48,14 @@ export default async function EventoDetallePage({
   const revisarPreciosSalon = Boolean(paramsQuery.revisar_precios_salon);
 
   return (
-    <section className="space-y-6">
+    <ExportExcelScope className="space-y-6">
       <PageHeader
         eyebrow="Evento"
         title={evento.cliente_nombre}
         description="Detalle comercial inicial del evento, salon asignado y responsable de venta."
         actions={
           <>
+            <ExportExcelButton kind="evento" id={evento.id} />
             <Link
               href={`/eventos/${evento.id}/editar`}
               className={buttonVariants({ variant: "primary" })}
@@ -234,7 +236,7 @@ export default async function EventoDetallePage({
         servicios={valores.servicios}
         totalEvento={valores.totalEvento}
       />
-    </section>
+    </ExportExcelScope>
   );
 }
 

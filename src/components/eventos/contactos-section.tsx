@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef } from "react";
+import { useExportForm } from "@/components/commercial-export";
 import { guardarContactosAction } from "@/app/(protected)/eventos/contactos-actions";
 import { ContactoAnterior, ContactosFields } from "./contactos-fields";
 import { SubmitButton } from "@/components/salones/submit-button";
@@ -9,14 +10,16 @@ import { Alert } from "@/components/ui/alert";
 import type { ContactosState } from "@/lib/contactos/queries";
 
 export function ContactosSection({ eventoId, initial }: { eventoId: string; initial: ContactosState }) {
-  const [state, action] = useActionState(guardarContactosAction.bind(null, eventoId), initial);
+  const [state, action, pending] = useActionState(guardarContactosAction.bind(null, eventoId), initial);
+  const formRef = useRef<HTMLFormElement>(null);
+  useExportForm(formRef, pending, Boolean(state.success), state);
   return (
     <Card>
       <CardHeader><CardTitle>Contactos del evento</CardTitle></CardHeader>
       <CardContent className="space-y-4">
         <ContactoAnterior value={state.contactoAnterior} />
         {state.puedeEditar ? (
-          <form action={action} className="space-y-4" noValidate>
+          <form ref={formRef} action={action} className="space-y-4" noValidate>
             <ContactosFields key={state.version} initial={state.contactos} version={state.version} error={state.error} />
             <SubmitButton pendingLabel="Guardando...">Guardar contactos</SubmitButton>
           </form>

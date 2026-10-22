@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
+import { useExportForm } from "@/components/commercial-export";
 import { addPrecioHistorialAction } from "@/app/(protected)/catering/actions";
 import { SubmitButton } from "@/components/salones/submit-button";
 import {
@@ -40,7 +41,7 @@ export function PrecioHistorialSection({
   historial,
   pax,
 }: PrecioHistorialSectionProps) {
-  const [state, formAction] = useActionState(
+  const [state, formAction, pending] = useActionState(
     addPrecioHistorialAction.bind(null, cateringId),
     getEmptyPrecioHistorialFormState(pax),
   );
@@ -51,6 +52,7 @@ export function PrecioHistorialSection({
       formRef.current?.reset();
     }
   }, [state.successMessage]);
+  useExportForm(formRef, pending, Boolean(state.successMessage), state);
 
   return (
     <Card>
