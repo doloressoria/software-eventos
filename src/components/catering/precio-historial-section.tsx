@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useExportForm } from "@/components/commercial-export";
 import { addPrecioHistorialAction } from "@/app/(protected)/catering/actions";
 import { SubmitButton } from "@/components/salones/submit-button";
@@ -114,9 +114,9 @@ export function PrecioHistorialSection({
           <form ref={formRef} action={formAction} className="mt-4 space-y-5" noValidate>
             <div className="grid gap-5 sm:grid-cols-2">
               <div>
-                <Label htmlFor="precio_unitario">Nuevo precio por persona</Label>
+                <Label htmlFor="historial-precio_unitario">Nuevo precio por persona</Label>
                 <Input
-                  id="precio_unitario"
+                  id="historial-precio_unitario"
                   name="precio_unitario"
                   type="number"
                   min="0.01"
@@ -125,11 +125,11 @@ export function PrecioHistorialSection({
                   defaultValue={state.fields.precio_unitario}
                   aria-invalid={Boolean(state.errors.precio_unitario)}
                   aria-describedby={
-                    state.errors.precio_unitario ? "precio_unitario-error" : undefined
+                    state.errors.precio_unitario ? "historial-precio_unitario-error" : undefined
                   }
                 />
                 {state.errors.precio_unitario ? (
-                  <FieldError id="precio_unitario-error">
+                  <FieldError id="historial-precio_unitario-error">
                     {state.errors.precio_unitario}
                   </FieldError>
                 ) : null}
@@ -159,24 +159,28 @@ export function PrecioHistorialSection({
                 />
               </div>
               <NumberField
+                key={`adultos-${pax.pax_adultos}`}
                 id="pax_adultos"
                 label="Adultos"
-                defaultValue={state.fields.pax_adultos}
+                defaultValue={pax.pax_adultos?.toString() ?? ""}
               />
               <NumberField
+                key={`jovenes-${pax.pax_jovenes}`}
                 id="pax_jovenes"
                 label="Jovenes"
-                defaultValue={state.fields.pax_jovenes}
+                defaultValue={pax.pax_jovenes?.toString() ?? ""}
               />
               <NumberField
+                key={`menores-${pax.pax_menores}`}
                 id="pax_menores"
                 label="Menores"
-                defaultValue={state.fields.pax_menores}
+                defaultValue={pax.pax_menores?.toString() ?? ""}
               />
               <NumberField
+                key={`bebes-${pax.pax_bebes}`}
                 id="pax_bebes"
                 label="Bebes"
-                defaultValue={state.fields.pax_bebes}
+                defaultValue={pax.pax_bebes?.toString() ?? ""}
               />
             </div>
 
@@ -206,10 +210,11 @@ function NumberField({
   id: string;
   label: string;
 }) {
+  const [value, setValue] = useState(defaultValue);
   return (
     <div>
-      <Label htmlFor={id}>{label}</Label>
-      <Input id={id} name={id} type="number" min="0" step="1" defaultValue={defaultValue} />
+      <Label htmlFor={`historial-${id}`}>{label}</Label>
+      <Input id={`historial-${id}`} name={id} type="number" min="0" step="1" value={value} onChange={(event) => setValue(event.target.value)} />
     </div>
   );
 }

@@ -103,7 +103,7 @@ export function LoginForm({ accessError, redirectTo }: LoginFormProps) {
         </div>
       ) : null}
 
-      <form className="mt-6 space-y-5" noValidate onSubmit={handleSubmit}>
+      <form method="post" className="mt-6 space-y-5" noValidate onSubmit={handleSubmit}>
         <div>
           <Label htmlFor="email">Email</Label>
           <Input

@@ -6,7 +6,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-// Generated from the complete public schema; generated writes are never.
+// Generated from the complete public schema; generated/trigger-owned writes are never.
 // admin_save_role accepts null to create a role.
 export type Database = {
   // Allows to automatically instantiate createClient with right options
@@ -207,9 +207,9 @@ export type Database = {
           salon_id?: string | null
           tipo_evento?: string | null
           tipo_servicio?: string | null
-          total_con_iva?: number | null
-          total_pagado?: number | null
-          total_sin_iva?: number | null
+          total_con_iva?: never
+          total_pagado?: never
+          total_sin_iva?: never
           updated_at?: string
         }
         Update: {
@@ -249,9 +249,9 @@ export type Database = {
           salon_id?: string | null
           tipo_evento?: string | null
           tipo_servicio?: string | null
-          total_con_iva?: number | null
-          total_pagado?: number | null
-          total_sin_iva?: number | null
+          total_con_iva?: never
+          total_pagado?: never
+          total_sin_iva?: never
           updated_at?: string
         }
         Relationships: [
@@ -1456,6 +1456,10 @@ export type Database = {
           salon_nombre: string
           tipo_evento: string
         }[]
+      }
+      crear_catering_con_precio: {
+        Args: { p_contrato: Json; p_motivo: string; p_precio: number }
+        Returns: string
       }
       current_user_has_screen_permission: {
         Args: { p_manage?: boolean; p_screens: string[] }

@@ -17,7 +17,6 @@ import {
   validateCateringItemForm,
   type CateringItemFormState,
 } from "@/lib/catering/item-validation";
-import { recalculateCateringTotals } from "@/lib/catering/recalculate-totals";
 import { searchEventosParaCatering } from "@/lib/catering/queries";
 import { getEmptyPagoFormState, validatePagoForm, type PagoFormState } from "@/lib/pagos/validation";
 import {
@@ -82,9 +81,8 @@ export async function createCateringAction(
     }
   }
 
-  const { data, error } = await supabase
-    .from("catering_contratos")
-    .insert({
+  const { data, error } = await supabase.rpc("crear_catering_con_precio", {
+    p_contrato: {
       evento_id: payload.evento_id,
       cliente_nombre: payload.cliente_nombre,
       cliente_razon_social: payload.cliente_razon_social,
@@ -92,7 +90,6 @@ export async function createCateringAction(
       cliente_contacto: payload.cliente_contacto,
       fecha_evento: payload.fecha_evento,
       lugar_evento: payload.lugar_evento,
-      salon_id: null,
       tipo_evento: payload.tipo_evento,
       tipo_servicio: payload.tipo_servicio,
       ejecutiva_id: payload.ejecutiva_id,
@@ -104,38 +101,16 @@ export async function createCateringAction(
       iva_comision: payload.iva_comision,
       iva_porcentaje: payload.iva_porcentaje,
       notas: payload.notas,
-      total_pagado: 0,
-    })
-    .select("id")
-    .maybeSingle();
+    },
+    p_precio: payload.precio_unitario_inicial,
+    p_motivo: payload.precio_motivo_inicial ?? "Inicial",
+  });
 
   if (error) {
-    logSupabaseError("createCateringAction insertar catering", error);
-    return { ...state, formError: "No se pudo crear el catering. Intenta nuevamente." };
-  }
-
-  if (!data) {
+    logSupabaseError("createCateringAction crear con precio", error);
     return { ...state, formError: CREATE_ERROR };
   }
-
-  const { error: historialError } = await supabase
-    .from("catering_precio_historial")
-    .insert({
-      catering_contrato_id: data.id,
-      precio_unitario: payload.precio_unitario_inicial,
-      motivo: payload.precio_motivo_inicial,
-      pax_adultos: payload.pax_adultos,
-      pax_jovenes: payload.pax_jovenes,
-      pax_menores: payload.pax_menores,
-      pax_bebes: payload.pax_bebes,
-      usuario_id: profile.id,
-    });
-
-  if (historialError) {
-    logSupabaseError("createCateringAction insertar precio inicial", historialError);
-  }
-
-  await recalculateCateringTotals(data.id);
+  if (!data) return { ...state, formError: CREATE_ERROR };
 
   revalidatePath("/catering");
 
@@ -143,7 +118,7 @@ export async function createCateringAction(
     revalidatePath(`/eventos/${payload.evento_id}`);
   }
 
-  redirect(`/catering/${data.id}?created=1`);
+  redirect(`/catering/${data}?created=1`);
 }
 
 export async function updateCateringAction(
@@ -213,8 +188,6 @@ export async function updateCateringAction(
   if (!data) {
     return { ...state, formError: NOT_FOUND_ERROR };
   }
-
-  await recalculateCateringTotals(cateringId);
 
   revalidatePath("/catering");
   revalidatePath(`/catering/${cateringId}`);
@@ -312,18 +285,6 @@ export async function addPrecioHistorialAction(
     };
   }
 
-  await supabase
-    .from("catering_contratos")
-    .update({
-      pax_adultos: payload.pax_adultos,
-      pax_jovenes: payload.pax_jovenes,
-      pax_menores: payload.pax_menores,
-      pax_bebes: payload.pax_bebes,
-    })
-    .eq("id", cateringId);
-
-  await recalculateCateringTotals(cateringId);
-
   revalidatePath(`/catering/${cateringId}`);
   revalidatePath("/catering");
 
@@ -365,8 +326,6 @@ export async function addCateringItemAction(
     logSupabaseError("addCateringItemAction insertar", error);
     return { ...state, formError: "No se pudo agregar el adicional. Intenta nuevamente." };
   }
-
-  await recalculateCateringTotals(cateringId);
 
   revalidatePath(`/catering/${cateringId}`);
   revalidatePath("/catering");
@@ -410,8 +369,6 @@ export async function deleteCateringItemAction(
   if (!data) {
     return { formError: "No se encontro el adicional." };
   }
-
-  await recalculateCateringTotals(cateringId);
 
   revalidatePath(`/catering/${cateringId}`);
   revalidatePath("/catering");
@@ -477,7 +434,6 @@ async function saveCateringPago(cateringId: string, pagoId: string | null, formD
 
   if (!data) return { ...state, formError: NOT_FOUND_ERROR };
 
-  await recalculateCateringTotals(cateringId);
   revalidateCateringPaths(cateringId, current.evento_id);
 
   return {
@@ -526,7 +482,6 @@ export async function deleteCateringPagoAction(
     return { formError: "No se encontro el pago." };
   }
 
-  await recalculateCateringTotals(cateringId);
   revalidateCateringPaths(cateringId, current.evento_id);
 
   return {};

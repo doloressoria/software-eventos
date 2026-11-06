@@ -54,7 +54,6 @@ export function DatePickerField({
   return (
     <div className="mt-2">
       <input
-        id={id}
         name={name}
         type="hidden"
         required={required}
@@ -63,8 +62,9 @@ export function DatePickerField({
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
+            id={id}
             type="button"
-            aria-describedby={ariaDescribedBy}
+            aria-describedby={[`${id}-value`, ariaDescribedBy].filter(Boolean).join(" ")}
             data-invalid={ariaInvalid ? "true" : undefined}
             className={cn(
               buttonVariants({ variant: "secondary" }),
@@ -72,7 +72,7 @@ export function DatePickerField({
               !selectedDate && "text-slate-500",
             )}
           >
-            <span>{selectedDate ? formatDisplayDate(selectedDate) : placeholder}</span>
+            <span id={`${id}-value`}>{selectedDate ? formatDisplayDate(selectedDate) : placeholder}</span>
             <CalendarIcon className="h-4 w-4 text-slate-500" aria-hidden="true" />
           </button>
         </PopoverTrigger>

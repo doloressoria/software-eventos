@@ -77,6 +77,19 @@ export function CateringForm({
     pax_menores: state.fields.pax_menores || (lockedEvento?.pax_menores?.toString() ?? ""),
     pax_bebes: state.fields.pax_bebes || (lockedEvento?.pax_bebes?.toString() ?? ""),
   }));
+  const savedPax = {
+    pax_adultos: initialState.fields.pax_adultos,
+    pax_jovenes: initialState.fields.pax_jovenes,
+    pax_menores: initialState.fields.pax_menores,
+    pax_bebes: initialState.fields.pax_bebes,
+  };
+  const savedPaxKey = JSON.stringify(savedPax);
+  const [previousPaxKey, setPreviousPaxKey] = useState(savedPaxKey);
+  // A recotización can update PAX on this same page; keep other draft fields intact.
+  if (mode === "edit" && previousPaxKey !== savedPaxKey) {
+    setPreviousPaxKey(savedPaxKey);
+    setPax(savedPax);
+  }
 
   function setPaxFromEvento(evento: EventoBuscadorResult) {
     setPax({
@@ -100,7 +113,7 @@ export function CateringForm({
           </CardHeader>
           <CardContent>
             <input type="hidden" name="con_evento" value="true" />
-            <Label>Evento vinculado</Label>
+            <Label htmlFor="evento_id">Evento vinculado</Label>
             <div className="mt-2">
               <EventoPickerField
                 name="evento_id"
@@ -140,7 +153,7 @@ export function CateringForm({
 
             {conEvento ? (
               <div className="mt-5">
-                <Label>Evento vinculado</Label>
+                <Label htmlFor="evento_id">Evento vinculado</Label>
                 <div className="mt-2">
                   <EventoPickerField name="evento_id" error={state.errors.evento_id} onSelect={setPaxFromEvento} />
                 </div>

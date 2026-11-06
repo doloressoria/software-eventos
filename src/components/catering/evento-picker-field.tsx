@@ -67,6 +67,7 @@ export function EventoPickerField({
         <>
           <div className="flex gap-2">
             <Input
+              id={name}
               type="text"
               placeholder="Buscar por cliente, salon o nombre del evento"
               value={query}
@@ -79,6 +80,7 @@ export function EventoPickerField({
               }}
               className="mt-0"
               aria-invalid={Boolean(error)}
+              aria-describedby={error ? "evento_id-error" : undefined}
             />
             <button
               type="button"

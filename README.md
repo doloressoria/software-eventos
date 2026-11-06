@@ -222,9 +222,38 @@ are `ARS`, `USD` and `EUR`; empty `moneda` defaults to `ARS`, and empty
 
 ## Current Status
 
-This repository contains only the initial application shell, Supabase helpers,
-route placeholders and migration scaffolding. The production schema and business
-logic still need validation before implementation.
+Events, contacts, event payments/expenses, catering, venue management, configurable
+roles, audit, reports and commercial Excel exports are implemented. The general
+`/pagos` screen remains a placeholder; use event/catering income screens.
+
+## Hands-on lab verification
+
+See [QA results, limitations and pending release work](docs/qa-lab-20261106.md)
+and the [participant script](docs/guion-hands-on-lab.md). Local frontend execution
+uses the database configured in `.env.local`; it does not isolate production data.
+This checkout lacks the complete Supabase baseline, `config.toml` and seed, so
+the local start/reset instructions above require that baseline first. Do not use
+a global reset or migration push against the shared project.
+
+Three corrections were applied to the shared database on 2026-11-06:
+`20261106190930_align_service_balance_with_partial_vat.sql` aligns generated
+service balances with partial VAT; `20261106190931_allow_authorized_expense_soft_delete.sql`
+unblocks expense soft deletion while retaining venue, role and active-user limits;
+`20261106191328_atomic_catering_totals.sql` keeps catering totals and price/PAX
+changes in the source transaction, and creates contracts with their initial price
+through an invoker RPC protected by the existing RLS policies.
+See the [release verification](docs/publicacion-lab-20261106.md) for deployment status.
+The first rewrites existing generated balances; column types and generated/write
+restrictions remain unchanged. The second permits scoped reads of deleted expenses
+needed by PostgreSQL UPDATE checks; application listings still filter active rows.
+The third preserves the existing commercial formula and does not backfill old
+contracts. Catering actions no longer perform a second HTTP recalculation.
+
+```bash
+PG_BIN=/opt/homebrew/opt/postgresql@17/bin pnpm test:balances:db
+PG_BIN=/opt/homebrew/opt/postgresql@17/bin pnpm test:egresos:db
+PG_BIN=/opt/homebrew/opt/postgresql@17/bin pnpm test:catering:db
+```
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 

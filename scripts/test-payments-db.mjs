@@ -11,6 +11,9 @@ const dir = mkdtempSync(join(tmpdir(), "eventos-pg-"));
 let started = false;
 const usd = process.argv.includes("--usd");
 const contactos = process.argv.includes("--contactos");
+const balances = process.argv.includes("--balances");
+const catering = process.argv.includes("--catering");
+const expenses = process.argv.includes("--expenses");
 try {
   execFileSync(pg("initdb"), ["-D", join(dir, "data"), "-U", "postgres",
     "-A", "trust", "-E", "UTF8", "--no-locale"], { stdio: "pipe" });
@@ -21,7 +24,32 @@ try {
     "begin;",
     readFileSync("supabase/tests/fixtures/payments-schema.sql", "utf8"),
     readFileSync("supabase/tests/payments-setup.sql", "utf8"),
-    ...(usd ? [
+    ...(catering ? [
+      readFileSync("supabase/migrations/20261021145259_unblock_payments_and_summary_access.sql", "utf8"),
+      readFileSync("supabase/migrations/20261021152307_evento_contactos.sql", "utf8"),
+      readFileSync("supabase/migrations/20261021155412_payments_manual_usd.sql", "utf8"),
+      readFileSync("supabase/tests/catering-atomic-before.sql", "utf8"),
+      readFileSync("supabase/migrations/20261106191328_atomic_catering_totals.sql", "utf8"),
+      readFileSync("supabase/tests/catering-atomic-after.sql", "utf8"),
+      "commit;",
+    ] : expenses ? [
+      readFileSync("supabase/migrations/20261021145259_unblock_payments_and_summary_access.sql", "utf8"),
+      readFileSync("supabase/migrations/20261021152307_evento_contactos.sql", "utf8"),
+      readFileSync("supabase/migrations/20261021155412_payments_manual_usd.sql", "utf8"),
+      readFileSync("supabase/tests/fixtures/expenses-schema.sql", "utf8"),
+      readFileSync("supabase/tests/expense-soft-delete-before.sql", "utf8"),
+      readFileSync("supabase/migrations/20261106190931_allow_authorized_expense_soft_delete.sql", "utf8"),
+      readFileSync("supabase/tests/expense-soft-delete-after.sql", "utf8"),
+      "rollback;",
+    ] : balances ? [
+      readFileSync("supabase/migrations/20261021145259_unblock_payments_and_summary_access.sql", "utf8"),
+      readFileSync("supabase/migrations/20261021152307_evento_contactos.sql", "utf8"),
+      readFileSync("supabase/migrations/20261021155412_payments_manual_usd.sql", "utf8"),
+      readFileSync("supabase/tests/service-balance-before.sql", "utf8"),
+      readFileSync("supabase/migrations/20261106190930_align_service_balance_with_partial_vat.sql", "utf8"),
+      readFileSync("supabase/tests/service-balance-after.sql", "utf8"),
+      "rollback;",
+    ] : usd ? [
       readFileSync("supabase/migrations/20261021145259_unblock_payments_and_summary_access.sql", "utf8"),
       readFileSync("supabase/migrations/20261021152307_evento_contactos.sql", "utf8"),
       `insert into pagos (id, evento_id, evento_servicio_id, fecha_pago, forma_pago, moneda, tipo_cambio, importe_moneda_original)
@@ -69,6 +97,7 @@ try {
   if (result.status !== 0) throw new Error(result.stderr);
   console.log(`${(result.stderr.match(/PASS:/g) || []).length} comprobaciones SQL aprobadas.`);
   if (contactos) await checkConcurrentPrincipals();
+  if (catering) await checkConcurrentCatering();
   console.log("PostgreSQL: pruebas aprobadas; el cluster efímero se elimina al terminar.");
 } catch (error) {
   console.error(error.message);
@@ -115,4 +144,32 @@ async function checkConcurrentPrincipals() {
   assert.ok(results.find((r) => r.status !== 0)?.stderr.includes("40001"));
   assert.equal(query(`select count(*) from public.evento_contactos where evento_id='${id}' and es_principal and deleted_at is null;`), "1");
   console.log("Concurrencia real: un guardado confirmado, otro rechazado por versión obsoleta y un único principal.");
+}
+
+async function checkConcurrentCatering() {
+  const args = ["-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1",
+    "-h", dir, "-p", "5432", "-U", "postgres", "-d", "postgres"];
+  const id = "00000000-0000-0000-0000-000000000060";
+  const eventId = "00000000-0000-0000-0000-000000000030";
+  const actor = "00000000-0000-0000-0000-000000000001";
+  const statements = [10, 20].map((amount) => `insert into catering_items
+    (catering_contrato_id,categoria,descripcion,precio_unitario,pax)
+    values('${id}','adicional_otros','Concurrente',${amount},1);`);
+  statements.push(...[100, 200].map((amount) => `insert into pagos
+    (catering_contrato_id,evento_id,fecha_pago,forma_pago,importe_moneda_original)
+    values('${id}','${eventId}','2026-12-01','efectivo_pesos',${amount});`));
+  await Promise.all(statements.map((statement) => new Promise((resolve, reject) => {
+    const child = spawn(pg("psql"), [...args, "-c", `begin; set local role authenticated;
+      select set_config('request.jwt.claim.sub','${actor}',true);
+      ${statement} select pg_sleep(.2); commit;`]);
+    let stderr = "";
+    child.stdout.resume();
+    child.stderr.on("data", (data) => { stderr += data; });
+    child.on("error", reject);
+    child.on("close", (status) => status === 0 ? resolve() : reject(new Error(stderr)));
+  })));
+  const row = execFileSync(pg("psql"), [...args, "-c", `select total_con_iva,total_pagado,saldo_pendiente
+    from catering_contratos where id='${id}';`], { encoding: "utf8" }).trim();
+  assert.equal(row, "1875.50|300.00|1575.50");
+  console.log("Concurrencia real: dos adicionales y dos pagos conservan total, cobrado y saldo.");
 }

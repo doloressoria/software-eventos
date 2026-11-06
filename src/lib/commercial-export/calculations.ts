@@ -22,7 +22,7 @@ export function serviceAmounts(service: ExportService, payments: ExportPayment[]
     balance: roundMoney(toMoneyNumber(service.total_con_iva) - paid), guarantees: sumGuarantees(own) };
 }
 
-// Diagnostic only: mirrors recalculateCateringTotals without executing its writes.
+// Diagnostic only: mirrors the transactional catering formula without executing writes.
 export function cateringAmounts(data: CateringExportData) {
   const { catering: c, history, items } = data;
   const payments = uniquePayments(data.payments);

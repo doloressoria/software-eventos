@@ -34,7 +34,6 @@ function setup(catering: boolean, options: { denied?: boolean; failure?: boolean
     "@/lib/pagos/validation": validation,
     "@/lib/pagos/calculos": calculos,
     "@/lib/evento-servicios/recalculate-totals": { recalculateEventoServicioTotals: async (id: string) => recalculated.push(id) },
-    "@/lib/catering/recalculate-totals": { recalculateCateringTotals: async (id: string) => recalculated.push(id) },
     "@/lib/roles/access": { requireScreenManagement: async () => {} },
     "@/lib/supabase/server": { createClient: async () => db },
     "@/lib/supabase/errors": { logSupabaseError() {} },
@@ -54,7 +53,7 @@ function form() {
 
 for (const mode of ["evento", "catering asociado", "catering externo"]) {
   const catering = mode !== "evento";
-  test(`${mode}: alta y edición escriben orígenes, conservan garantía/banco y recalculan`, async () => {
+  test(`${mode}: alta y edición escriben orígenes y conservan garantía/banco`, async () => {
     for (const editing of [false, true]) {
       const s = setup(catering, { external: mode === "catering externo" });
       const name = `${editing ? "update" : "create"}${catering ? "Catering" : ""}PagoAction`;
@@ -75,7 +74,8 @@ for (const mode of ["evento", "catering asociado", "catering externo"]) {
         assert.equal("registrado_por" in write.values, false);
       }
       if (mode === "catering externo") assert.equal(write.values.evento_id, null);
-      assert.ok(s.recalculated.includes(catering ? "contract" : "service"));
+      if (catering) assert.equal(s.recalculated.length, 0);
+      else assert.ok(s.recalculated.includes("service"));
       if (!catering && editing) assert.ok(s.recalculated.includes("old-service"));
     }
   });
@@ -91,12 +91,13 @@ for (const mode of ["evento", "catering asociado", "catering externo"]) {
       if (denied) assert.equal(s.writes.length, 0);
     }
   });
-  test(`${mode}: baja usa destino autorizado y recalcula`, async () => {
+  test(`${mode}: baja usa destino autorizado`, async () => {
     const s = setup(catering);
     await s.exports[`delete${catering ? "Catering" : ""}PagoAction`](catering ? "contract" : "event", "payment", {}, new FormData());
     const write = s.writes.find(w => w.table === "pagos")!;
     assert.ok(write.values.deleted_at);
     assert.equal(Object.keys(write.values).length, 1);
-    assert.ok(s.recalculated.includes(catering ? "contract" : "old-service"));
+    if (catering) assert.equal(s.recalculated.length, 0);
+    else assert.ok(s.recalculated.includes("old-service"));
   });
 }

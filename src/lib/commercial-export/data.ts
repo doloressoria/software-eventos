@@ -86,7 +86,7 @@ export async function loadCommercialExport(client: Client, kind: "evento" | "cat
   const event = catering.evento_id && allowed("eventos") ? await eventById(catering.evento_id, false) : null;
   const [items, history, payments, currentContacts] = await Promise.all([
     allRows((start, end) => client.from("catering_items").select("*").eq("catering_contrato_id", id).order("created_at").order("id").range(start, end)),
-    allRows((start, end) => client.from("catering_precio_historial").select("*").eq("catering_contrato_id", id).order("fecha", { ascending: false }).order("created_at", { ascending: false }).range(start, end)),
+    allRows((start, end) => client.from("catering_precio_historial").select("*").eq("catering_contrato_id", id).order("fecha", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }).range(start, end)),
     cateringPayments(catering),
     event ? contacts(event.id) : Promise.resolve([]),
   ]);

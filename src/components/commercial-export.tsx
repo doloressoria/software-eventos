@@ -23,7 +23,12 @@ export function ExportExcelScope({ children, className }: { children: ReactNode;
   const updatePending = useCallback(() => setPending([...forms.current.values()].some((entry) => entry.pending)), []);
   const register = useCallback((ref: FormRef) => {
     if (ref.current) forms.current.set(ref, { baseline: formValue(ref.current), pending: false });
-    return () => { forms.current.delete(ref); updatePending(); };
+    // Radix finishes synchronizing native selects after the mount effects.
+    const frame = requestAnimationFrame(() => {
+      const entry = forms.current.get(ref);
+      if (entry && ref.current) entry.baseline = formValue(ref.current);
+    });
+    return () => { cancelAnimationFrame(frame); forms.current.delete(ref); updatePending(); };
   }, [updatePending]);
   const update = useCallback((ref: FormRef, saving: boolean, saved: boolean) => {
     const entry = forms.current.get(ref);

@@ -273,7 +273,8 @@ export async function getCateringById(id: string) {
       )
       .eq("catering_contrato_id", id)
       .order("fecha", { ascending: false })
-      .order("created_at", { ascending: false }),
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false }),
   ]);
 
   if (cateringResult.error) {
