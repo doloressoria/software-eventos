@@ -2,8 +2,9 @@
 
 Duración sugerida: 25–35 minutos por participante. Usar un cliente nuevo con nombre
 `LAB + fecha + participante`; no editar registros reales. Antes de comenzar,
-publicar y comprobar las correcciones del [informe QA](qa-lab-20261106.md), resolver
-el saldo SQL y la baja de egresos por RLS, y preparar sesiones admin y vendedor con salones separados.
+consultar la [publicación verificada](publicacion-lab-20261106.md) y preparar
+sesiones admin y vendedor con salones separados. Las correcciones de frontend,
+saldo SQL, baja de egresos y transacciones de catering ya están publicadas.
 La fase vendedor **no fue validada en Chrome** durante esta entrega por falta de
 otra cuenta. No comenzar un lab completo con esa cobertura pendiente.
 
