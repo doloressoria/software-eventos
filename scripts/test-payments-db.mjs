@@ -36,9 +36,9 @@ try {
         "20261106191328_atomic_catering_totals",
       ].map((name) => readFileSync(`supabase/migrations/${name}.sql`, "utf8")),
       readFileSync("supabase/tests/cheques-before.sql", "utf8"),
-      readFileSync("supabase/migrations/20261110160147_acreditacion_cheques.sql", "utf8"),
+      readFileSync("supabase/migrations/20261110211110_acreditacion_cheques.sql", "utf8"),
       ...(imputaciones ? [
-        readFileSync("supabase/migrations/20261110200716_imputaciones_cobros.sql", "utf8"),
+        readFileSync("supabase/migrations/20261110211132_imputaciones_cobros.sql", "utf8"),
       ] : []),
       readFileSync("supabase/tests/cheques.sql", "utf8"),
       ...(imputaciones ? [readFileSync("supabase/tests/imputaciones.sql", "utf8")] : []),

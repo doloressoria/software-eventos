@@ -47,7 +47,7 @@ la parte de su contrato, conforme a los permisos de lectura del módulo.
    históricos sin equivalente se conservan sin asignarles una cotización.
 3. Con las escrituras de pagos suspendidas, ejecutar en una transacción
    (`begin;` … `commit;`) el
-   [SQL de imputaciones](../supabase/migrations/20261110200716_imputaciones_cobros.sql).
+   [SQL de imputaciones](../supabase/migrations/20261110211132_imputaciones_cobros.sql).
    Usar el propietario de la base, como en el runbook de cheques. El Cron
    existente adopta la nueva lógica sin registrar otra tarea.
 4. Ejecutar [postflight-imputaciones.sql](../supabase/verification/postflight-imputaciones.sql).
@@ -62,7 +62,7 @@ la parte de su contrato, conforme a los permisos de lectura del módulo.
    sus listados y exportaciones por destino. En ese caso, mantener la operación
    de cobros suspendida y corregir hacia adelante.
 
-## Diferencias por verificar en la base desplegada
+## Catálogo desplegado
 
 El adjunto parcial declara `evento_id` obligatorio en pagos, contratos y
 egresos. El esquema del repo admite nulos para catering externo. El adjunto
@@ -73,8 +73,16 @@ decimales para importes y cuatro para cotización. El trigger de moneda fija
 tiene `ON DELETE CASCADE` en el esquema de pruebas del repo, mientras que el
 adjunto usa la acción por defecto. Verificar también la restricción de
 destino exclusivo y las políticas, triggers e historial remoto que el
-adjunto no describe. El preflight y el runbook de cheques cubren
-estos puntos. No se consultó la base desplegada durante este cambio.
+adjunto no describe.
+
+El 10/11/2026 se aplicaron las tres migraciones en producción mediante el
+conector de Supabase. Los nombres de archivo coinciden con las versiones
+registradas por el conector. La posvalidación dio cero diferencias de saldo
+en servicios y catering, y cero inconsistencias de cabeceras y destinos.
+También confirmó vistas invoker, RLS, auditoría y bloqueo de escritura directa
+en las imputaciones. El Cron quedó activo y registró una ejecución exitosa.
+La conciliación de versiones anteriores al cambio sigue detallada en el
+runbook de cheques.
 
 ## Pruebas aisladas
 

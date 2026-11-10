@@ -43,12 +43,12 @@ reescribe. Confirmar por separado si comercialmente debería significar
    una base de IVA que ya estaba guardada.
 2. Coordinar una ventana sin altas ni ediciones de pagos. En una transacción
    (`begin;` … `commit;`), ejecutar
-   [20261110160147_acreditacion_cheques.sql](../supabase/migrations/20261110160147_acreditacion_cheques.sql).
+   [20261110211110_acreditacion_cheques.sql](../supabase/migrations/20261110211110_acreditacion_cheques.sql).
    Reutiliza LAB-006 y catering atómico; no volver a aplicar sus migraciones.
    Las vistas leen el día argentino al consultar. Los triggers actualizan
    los totales derivados en la transacción de cada escritura acreditada.
 3. En otra transacción, ejecutar
-   [20261110160420_programar_acreditacion_cheques.sql](../supabase/migrations/20261110160420_programar_acreditacion_cheques.sql)
+   [20261110211121_programar_acreditacion_cheques.sql](../supabase/migrations/20261110211121_programar_acreditacion_cheques.sql)
    como propietario de la base. Instala [Supabase Cron](https://supabase.com/docs/guides/cron/install)
    si falta, registra una sola tarea por nombre y sincroniza una vez. La tarea
    reconcilia totales guardados cada minuto y recupera días omitidos. Los
