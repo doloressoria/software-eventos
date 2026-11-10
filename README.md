@@ -106,6 +106,9 @@ pnpm dev
 
 Open `http://localhost:3000`.
 
+After signing in, use **Cerrar sesión** in the panel header to sign out of the
+current session and return to the login screen.
+
 ## Start Supabase Locally
 
 The local Supabase stack requires Docker.
