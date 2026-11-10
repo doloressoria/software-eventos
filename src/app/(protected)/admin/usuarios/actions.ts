@@ -1,6 +1,5 @@
 "use server";
 
-import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
@@ -12,6 +11,7 @@ import {
   validateUsuarioForm,
   uuidPattern,
 } from "@/lib/usuarios/validation";
+import { sendPasswordSetupEmail } from "@/lib/usuarios/welcome-email";
 
 const INDEFINITE_BAN_DURATION = "876000h";
 
@@ -42,14 +42,12 @@ export async function createUsuarioAction(
     };
   }
 
-  const temporaryPassword = generateTemporaryPassword();
   const admin = createAdminClient();
   const { data: authData, error: authError } =
     await admin.auth.admin.createUser({
       ban_duration: payload.activo ? "none" : INDEFINITE_BAN_DURATION,
       email: payload.email,
       email_confirm: true,
-      password: temporaryPassword,
       user_metadata: { full_name: payload.fullName },
     });
 
@@ -101,13 +99,35 @@ export async function createUsuarioAction(
   }
 
   revalidateUserPaths(authData.user.id);
+  const emailSent = payload.activo && await sendPasswordSetupEmail(authData.user.id, payload.email);
 
   return {
     ...state,
     formError: null,
-    successMessage: "Usuario creado correctamente.",
-    temporaryPassword,
+    createdUser: {
+      id: authData.user.id,
+      invitation: !payload.activo ? "inactive" : emailSent ? "sent" : "failed",
+    },
   };
+}
+
+export async function resendPasswordSetupAction(id: string) {
+  await requireAdmin();
+  if (!uuidPattern.test(id)) return { error: "El usuario indicado no es válido." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("usuarios")
+    .select("email, activo")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error || !data?.activo) return { error: "El enlace solo se puede enviar a un usuario activo." };
+  if (!await sendPasswordSetupEmail(id, data.email)) {
+    return { error: "No se pudo confirmar el envío del enlace. Volvé a intentar." };
+  }
+
+  return { message: `Se envió el enlace para definir la contraseña a ${data.email}.` };
 }
 
 export async function updateUsuarioAction(
@@ -272,10 +292,6 @@ async function getSelectedRole(roleId: string) {
     .maybeSingle();
 
   return error ? null : data;
-}
-
-function generateTemporaryPassword() {
-  return `${randomBytes(12).toString("base64url")}aA1!`;
 }
 
 function isDuplicateAuthEmail(error: unknown) {

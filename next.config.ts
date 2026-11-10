@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  devIndicators: { position: "bottom-right" },
   outputFileTracingIncludes: {
     "/eventos/*/excel": ["./resources/commercial-excel/evento.xlsx"],
     "/catering/*/excel": ["./resources/commercial-excel/catering.xlsx"],

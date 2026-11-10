@@ -1,4 +1,3 @@
-import { SignOutButton } from "@/components/sign-out-button";
 import { Badge } from "@/components/ui/badge";
 
 export function AppHeader() {
@@ -13,12 +12,9 @@ export function AppHeader() {
             Administracion de eventos y finanzas
           </h2>
         </div>
-        <div className="flex shrink-0 items-start gap-3">
-          <Badge variant="success" className="mt-2 hidden sm:inline-flex">
-            Sistema activo
-          </Badge>
-          <SignOutButton />
-        </div>
+        <Badge variant="success" className="hidden sm:inline-flex">
+          Sistema activo
+        </Badge>
       </div>
     </header>
   );

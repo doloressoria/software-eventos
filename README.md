@@ -43,6 +43,10 @@ Fill in `.env.local` with the Supabase project values.
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Public anonymous key for browser and server clients using RLS.
 - `SUPABASE_SERVICE_ROLE_KEY`: Server-only key required by administrative user
   creation and Auth synchronization.
+- `APP_URL`: Public application origin used in welcome emails. Use the HTTPS
+  production URL or `http://localhost:3000` for local development.
+- `RESEND_API_KEY`: Server-only Resend key with sending permission.
+- `USUARIOS_EMAIL_FROM`: Sender address on a domain verified in Resend.
 
 Never expose `SUPABASE_SERVICE_ROLE_KEY` in client components, browser bundles or
 public logs.
@@ -51,10 +55,16 @@ public logs.
 
 Administrators manage users at `/admin/usuarios` and configure roles at
 `/admin/roles`. A role enables modules; venue access remains assigned per user,
-so two users with the same role can work on different venues. Creating a user uses the
-server-only Supabase Admin API and generates a strong temporary password. The
-password is displayed once after creation, is never stored in `public.usuarios`
-or `audit_log`, and must be communicated through a secure channel.
+so two users with the same role can work on different venues. Creating an active
+user emails a one-time link to **Elegí tu contraseña**. The recipient chooses a
+password directly and then signs in. Signed-in users can open **Cambiar contraseña**
+from the account menu at the bottom of the sidebar.
+
+To enable welcome emails, configure `APP_URL`, `RESEND_API_KEY` and
+`USUARIOS_EMAIL_FROM` in the deployment environment and disable click tracking on
+the sending domain in Resend. If sending fails or a link expires, open the user's
+edit page and choose **Enviar enlace para definir contraseña**. For an inactive
+user, activate the account before sending the link.
 
 Apply the user-management migration before deploying the application:
 
@@ -106,8 +116,8 @@ pnpm dev
 
 Open `http://localhost:3000`.
 
-After signing in, use **Cerrar sesión** in the panel header to sign out of the
-current session and return to the login screen.
+After signing in, open the account menu at the bottom of the sidebar and choose
+**Cerrar sesión** to return to the login screen.
 
 ## Start Supabase Locally
 

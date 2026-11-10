@@ -63,11 +63,11 @@ export function UsuarioForm({
     [initialState.fields.salonIds],
   );
 
-  if (state.temporaryPassword) {
+  if (state.createdUser) {
     return (
       <CreatedUserResult
-        email={initialState.fields.email || state.fields.email}
-        temporaryPassword={state.temporaryPassword}
+        email={state.fields.email}
+        createdUser={state.createdUser}
       />
     );
   }
@@ -280,9 +280,9 @@ export function UsuarioForm({
 
           {mode === "create" ? (
             <Alert>
-              Se generara una contraseña temporal segura. Se mostrara una sola
-              vez al finalizar para que puedas copiarla y comunicarla por un
-              canal seguro.
+              {active
+                ? "Enviaremos al usuario un enlace para que elija su contraseña."
+                : "Podés enviar el enlace para elegir la contraseña desde el perfil cuando actives al usuario."}
             </Alert>
           ) : null}
 
@@ -309,49 +309,35 @@ export function UsuarioForm({
 
 function CreatedUserResult({
   email,
-  temporaryPassword,
+  createdUser,
 }: {
   email: string;
-  temporaryPassword: string;
+  createdUser: NonNullable<UsuarioFormState["createdUser"]>;
 }) {
-  const [copied, setCopied] = useState(false);
-
-  async function copyPassword() {
-    await navigator.clipboard.writeText(temporaryPassword);
-    setCopied(true);
-  }
+  const messages = {
+    sent: `Se envió a ${email} el enlace para elegir la contraseña.`,
+    failed: "No se pudo confirmar el envío. Podés volver a enviar el enlace desde el perfil del usuario.",
+    inactive: "Activá el usuario desde su perfil para poder enviarle el enlace.",
+  };
 
   return (
     <Card className="max-w-2xl border-emerald-200">
       <CardHeader>
         <CardTitle>Usuario creado correctamente</CardTitle>
         <CardDescription>
-          Copia la contraseña ahora. No se guarda en el perfil ni se volvera a
-          mostrar al salir de esta pantalla.
+          {messages[createdUser.invitation]}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="rounded-xl border border-slate-200 bg-slate-950 p-4 text-white">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-            Credenciales temporales
-          </p>
-          <p className="mt-3 text-sm text-slate-300">{email}</p>
-          <code className="mt-2 block break-all text-base font-semibold text-white">
-            {temporaryPassword}
-          </code>
-        </div>
-        <Alert variant="warning">
-          Comunica estas credenciales por un canal seguro. La contraseña nunca
-          se almacena en <code>public.usuarios</code> ni en la auditoria.
-        </Alert>
         <div className="flex flex-wrap justify-end gap-3">
-          <button
-            type="button"
-            onClick={copyPassword}
-            className={buttonVariants({ variant: "secondary" })}
-          >
-            {copied ? "Copiada" : "Copiar contraseña"}
-          </button>
+          {createdUser.invitation !== "sent" && (
+            <Link
+              href={`/admin/usuarios/${createdUser.id}/editar`}
+              className={buttonVariants({ variant: "secondary" })}
+            >
+              Abrir perfil
+            </Link>
+          )}
           <Link
             href="/admin/usuarios?created=1"
             className={buttonVariants({ variant: "primary" })}

@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  if (pathname === "/definir-contrasena") return NextResponse.next();
   const isPublicRoute = pathname === "/login";
   const { accessDenied, claims, isAdmin, permissions, response } = await updateSession(request);
   const isAuthenticated = Boolean(claims);

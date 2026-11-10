@@ -29,13 +29,13 @@ export function SignOutButton() {
   }
 
   return (
-    <div className="text-right">
-      <Button variant="outline" size="sm" onClick={signOut} disabled={pending}>
+    <div>
+      <Button variant="ghost" size="sm" className="w-full justify-start" onClick={signOut} disabled={pending}>
         <LogOut aria-hidden="true" />
         {pending ? "Cerrando sesión…" : "Cerrar sesión"}
       </Button>
       {failed && (
-        <p role="alert" className="mt-1 max-w-40 text-xs text-red-700">
+        <p role="alert" className="px-3.5 py-1 text-xs text-red-700">
           No se pudo cerrar la sesión. Volvé a intentar.
         </p>
       )}

@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ComponentType, SVGProps } from "react";
+import type { ComponentType, ReactNode, SVGProps } from "react";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/utils/cn";
 import type { ScreenPermission } from "@/lib/roles/permissions";
@@ -70,15 +70,23 @@ const navigation: NavigationItem[] = [
   },
 ];
 
-export function AppSidebar({ isAdmin, permissions }: { isAdmin: boolean; permissions: string[] }) {
+export function AppSidebar({
+  isAdmin,
+  permissions,
+  accountMenu,
+}: {
+  isAdmin: boolean;
+  permissions: string[];
+  accountMenu: ReactNode;
+}) {
   const pathname = usePathname();
   const visibleNavigation = navigation.filter(
     (item) => (!item.adminOnly || isAdmin) && (!item.permission || permissions.includes(item.permission)),
   );
 
   return (
-    <aside className="border-b border-slate-200/70 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85 lg:sticky lg:top-0 lg:min-h-screen lg:w-72 lg:border-b-0 lg:border-r">
-      <div className="flex h-full flex-col px-4 py-5">
+    <aside className="flex flex-col border-b border-slate-200/70 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85 lg:sticky lg:top-0 lg:h-dvh lg:w-72 lg:shrink-0 lg:self-start lg:border-b-0 lg:border-r">
+      <div className="px-4 pt-5 pb-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
         <Link
           href="/dashboard"
           className="flex items-center gap-3 rounded-2xl px-2 py-1.5 transition hover:bg-slate-50"
@@ -120,6 +128,9 @@ export function AppSidebar({ isAdmin, permissions }: { isAdmin: boolean; permiss
             reportes.
           </p>
         </div>
+      </div>
+      <div className="shrink-0 border-t border-slate-200/70 px-4 py-3">
+        {accountMenu}
       </div>
     </aside>
   );

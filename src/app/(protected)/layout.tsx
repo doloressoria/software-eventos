@@ -1,3 +1,4 @@
+import { AccountMenu } from "@/components/account-menu";
 import { AppHeader } from "@/components/app-header";
 import { AppSidebar } from "@/components/app-sidebar";
 import { redirect } from "next/navigation";
@@ -23,6 +24,7 @@ export default async function ProtectedLayout({
       <AppSidebar
         isAdmin={profile.rol === "admin"}
         permissions={permissions.map((permission) => permission.screen)}
+        accountMenu={<AccountMenu name={profile.full_name} email={profile.email} />}
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader />

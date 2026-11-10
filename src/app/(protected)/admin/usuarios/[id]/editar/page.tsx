@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { updateUsuarioAction } from "@/app/(protected)/admin/usuarios/actions";
+import { resendPasswordSetupAction, updateUsuarioAction } from "@/app/(protected)/admin/usuarios/actions";
+import { ResendPasswordSetupForm } from "@/components/usuarios/resend-password-setup-form";
 import { UsuarioForm } from "@/components/usuarios/usuario-form";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -27,8 +28,7 @@ export default async function EditarUsuarioPage({
       salonIds,
     },
     formError: null,
-    successMessage: null,
-    temporaryPassword: null,
+    createdUser: null,
   };
 
   return (
@@ -59,6 +59,7 @@ export default async function EditarUsuarioPage({
         roles={roles}
         salones={salones}
       />
+      {user.activo && <ResendPasswordSetupForm send={resendPasswordSetupAction.bind(null, id)} />}
     </section>
   );
 }

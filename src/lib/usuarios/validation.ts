@@ -14,8 +14,7 @@ export type UsuarioFormState = {
   errors: UsuarioFormErrors;
   fields: UsuarioFormFields;
   formError: string | null;
-  successMessage: string | null;
-  temporaryPassword: string | null;
+  createdUser: { id: string; invitation: "sent" | "failed" | "inactive" } | null;
 };
 
 export const emptyUsuarioFormState: UsuarioFormState = {
@@ -28,11 +27,10 @@ export const emptyUsuarioFormState: UsuarioFormState = {
     salonIds: [],
   },
   formError: null,
-  successMessage: null,
-  temporaryPassword: null,
+  createdUser: null,
 };
 
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const emailPattern = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
 export const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -82,8 +80,7 @@ export function validateUsuarioForm(formData: FormData): {
       errors,
       fields,
       formError: hasErrors ? "Revisa los campos marcados." : null,
-      successMessage: null,
-      temporaryPassword: null,
+      createdUser: null,
     },
   };
 }
