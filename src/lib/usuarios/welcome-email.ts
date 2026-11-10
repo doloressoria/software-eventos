@@ -1,11 +1,12 @@
 import "server-only";
+import { createTransport } from "nodemailer";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function sendPasswordSetupEmail(userId: string, email: string) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.USUARIOS_EMAIL_FROM;
+  const password = process.env.GMAIL_APP_PASSWORD?.replace(/\s/g, "");
+  const from = process.env.USUARIOS_EMAIL_FROM?.trim();
   const siteUrl = process.env.APP_URL;
-  if (!apiKey || !from || !siteUrl) return false;
+  if (!password || !from || !siteUrl) return false;
 
   try {
     const changePasswordUrl = new URL("/definir-contrasena", siteUrl);
@@ -22,25 +23,24 @@ export async function sendPasswordSetupEmail(userId: string, email: string) {
 
     changePasswordUrl.hash = new URLSearchParams({ token_hash: data.properties.hashed_token }).toString();
 
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from,
-        to: [email],
-        subject: "Elegí tu contraseña de Software Eventos",
-        text: [
-          "Abrí este enlace para elegir tu contraseña de Software Eventos.",
-          changePasswordUrl.toString(),
-          "El enlace vence y se puede usar una sola vez. Si recibiste varios, usá el más reciente.",
-        ].join("\n\n"),
-      }),
-      signal: AbortSignal.timeout(8_000),
+    const mailer = createTransport({
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
+      auth: { user: from, pass: password },
     });
-    return response.ok;
+    const result = await mailer.sendMail({
+      signal: AbortSignal.timeout(20_000),
+      from: { name: "Software Eventos", address: from },
+      to: { name: "", address: email },
+      subject: "Elegí tu contraseña de Software Eventos",
+      text: [
+        "Abrí este enlace para elegir tu contraseña de Software Eventos.",
+        changePasswordUrl.toString(),
+        "El enlace vence y se puede usar una sola vez. Si recibiste varios, usá el más reciente.",
+      ].join("\n\n"),
+    });
+    return result.accepted.length === 1;
   } catch {
     return false;
   }

@@ -2,5 +2,7 @@ allowBuilds:
   sharp: false
   supabase: true
   unrs-resolver: false
+minimumReleaseAgeExclude:
+  - nodemailer@10.5.0
 overrides:
   "@babel/core": 7.29.6

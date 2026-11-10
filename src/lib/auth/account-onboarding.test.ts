@@ -17,15 +17,29 @@ function loadModule(path: string, globals: Record<string, unknown>) {
 test("el correo incluye únicamente el enlace de un uso generado para el destinatario", async () => {
   const env = {
     APP_URL: "https://eventos.example",
-    RESEND_API_KEY: "test-key",
-    USUARIOS_EMAIL_FROM: "no-reply@eventos.example",
+    GMAIL_APP_PASSWORD: "test key",
+    USUARIOS_EMAIL_FROM: "eventos@gmail.example",
   };
-  const requests: Array<{ url: string; body: string }> = [];
+  const messages: Array<{ from: { address: string }; to: { address: string }; text: string }> = [];
   let ok = true;
   let linkUserId = "test-user";
   const { sendPasswordSetupEmail } = loadModule("src/lib/usuarios/welcome-email.ts", {
     require: (name: string) => {
       if (name === "server-only") return {};
+      if (name === "nodemailer") {
+        return { createTransport: (options: { host: string; port: number; secure: boolean; auth: { user: string; pass: string } }) => {
+          assert.equal(options.host, "smtp.gmail.com");
+          assert.equal(options.port, 465);
+          assert.equal(options.secure, true);
+          assert.equal(options.auth.user, env.USUARIOS_EMAIL_FROM);
+          assert.equal(options.auth.pass, "testkey");
+          return { sendMail: async (message: (typeof messages)[number]) => {
+            messages.push(message);
+            if (!ok) throw new Error("SMTP rejected the message");
+            return { accepted: [message.to.address] };
+          } };
+        } };
+      }
       assert.equal(name, "@/lib/supabase/admin");
       return { createAdminClient: () => ({ auth: { admin: {
         generateLink: async ({ type, email }: { type: string; email: string }) => {
@@ -39,27 +53,23 @@ test("el correo incluye únicamente el enlace de un uso generado para el destina
     URL,
     URLSearchParams,
     AbortSignal,
-    fetch: async (url: string, options: RequestInit) => {
-      requests.push({ url, body: String(options.body) });
-      return { ok };
-    },
   }) as { sendPasswordSetupEmail: (id: string, email: string) => Promise<boolean> };
 
   const send = () => sendPasswordSetupEmail("test-user", "usuario@example.com");
   assert.equal(await send(), true);
-  assert.equal(requests[0].url, "https://api.resend.com/emails");
-  const body = JSON.parse(requests[0].body);
-  assert.deepEqual(body.to, ["usuario@example.com"]);
-  assert.doesNotMatch(body.text, /contraseña temporal/i);
-  assert.match(body.text, /^https:\/\/eventos\.example\/definir-contrasena#token_hash=test-hash$/m);
+  const [message] = messages;
+  assert.equal(message.from.address, env.USUARIOS_EMAIL_FROM);
+  assert.equal(message.to.address, "usuario@example.com");
+  assert.doesNotMatch(message.text, /contraseña temporal/i);
+  assert.match(message.text, /^https:\/\/eventos\.example\/definir-contrasena#token_hash=test-hash$/m);
 
   ok = false;
   assert.equal(await send(), false);
   linkUserId = "other-user";
   assert.equal(await send(), false);
-  env.RESEND_API_KEY = "";
+  env.GMAIL_APP_PASSWORD = "";
   assert.equal(await send(), false);
-  assert.equal(requests.length, 2);
+  assert.equal(messages.length, 2);
 });
 
 test("el cambio usa la identidad de la sesión y verifica la contraseña antes de actualizar", async () => {

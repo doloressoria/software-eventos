@@ -45,8 +45,8 @@ Fill in `.env.local` with the Supabase project values.
   creation and Auth synchronization.
 - `APP_URL`: Public application origin used in welcome emails. Use the HTTPS
   production URL or `http://localhost:3000` for local development.
-- `RESEND_API_KEY`: Server-only Resend key with sending permission.
-- `USUARIOS_EMAIL_FROM`: Sender address on a domain verified in Resend.
+- `GMAIL_APP_PASSWORD`: Server-only Google app password for the sending account.
+- `USUARIOS_EMAIL_FROM`: Gmail address used as both the sender and SMTP login.
 
 Never expose `SUPABASE_SERVICE_ROLE_KEY` in client components, browser bundles or
 public logs.
@@ -60,11 +60,12 @@ user emails a one-time link to **Elegí tu contraseña**. The recipient chooses 
 password directly and then signs in. Signed-in users can open **Cambiar contraseña**
 from the account menu at the bottom of the sidebar.
 
-To enable welcome emails, configure `APP_URL`, `RESEND_API_KEY` and
-`USUARIOS_EMAIL_FROM` in the deployment environment and disable click tracking on
-the sending domain in Resend. If sending fails or a link expires, open the user's
-edit page and choose **Enviar enlace para definir contraseña**. For an inactive
-user, activate the account before sending the link.
+To enable welcome emails, configure `APP_URL` and `USUARIOS_EMAIL_FROM` in the
+deployment environment. Enable 2-Step Verification on the sending account and
+store its Google app password as `GMAIL_APP_PASSWORD` in the deployment's secrets.
+Redeploy to apply the settings. If sending fails or a link expires, open the
+user's edit page and choose **Enviar enlace para definir contraseña**. For an
+inactive user, activate the account before sending the link.
 
 Apply the user-management migration before deploying the application:
 
