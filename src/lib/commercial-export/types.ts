@@ -1,11 +1,11 @@
 import type { Tables } from "../../types/database.types";
 
-export type ExportPayment = Pick<Tables<"pagos">,
+export type ExportPayment = Omit<Pick<Tables<"pagos">,
   | "id" | "evento_id" | "evento_servicio_id" | "catering_contrato_id"
   | "concepto" | "created_at" | "fecha_pago" | "forma_pago" | "moneda" | "banco"
   | "numero_cheque" | "importe_moneda_original" | "tipo_cambio"
   | "importe_en_pesos" | "es_garantia" | "deleted_at" | "notas"
->;
+>, "importe_moneda_original"> & { importe_moneda_original: number | null; pago_id?: string | null };
 export type ExportContact = Pick<Tables<"evento_contactos">,
   "nombre" | "telefono" | "correo" | "relacion" | "observaciones" | "es_principal"
 >;

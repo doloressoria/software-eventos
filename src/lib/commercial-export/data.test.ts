@@ -15,7 +15,7 @@ function database({ screens = ["eventos", "catering"], active = true, authentica
   const selections: string[] = [];
   const rows: Record<string, object[]> = {
     usuarios: [{ id: fixtureId(99), rol: "vendedor", activo: active }], eventos: [event.event],
-    v_evento_servicios_acreditados: event.services, pagos: [...event.payments, ...catering.payments.map((p) => ({ ...p, id: `contract-${p.id}` }))],
+    v_evento_servicios_acreditados: event.services, v_pago_imputaciones: [...event.payments, ...catering.payments.map((p) => ({ ...p, id: `contract-${p.id}` }))],
     v_catering_acreditado: [catering.catering], catering_items: catering.items, catering_precio_historial: catering.history,
     evento_contactos: event.contacts.map((c) => ({ ...c, evento_id: event.event.id, deleted_at: null })), actualizaciones_ipc: event.updates,
   };
@@ -83,12 +83,12 @@ test("sin sesión, usuario inactivo, pantalla denegada o registro inaccesible no
   ] as const) {
     const db = database(options);
     await assert.rejects(loadCommercialExport(db.client, kind, id), (error: unknown) => error instanceof ExportError && error.status === status);
-    assert.ok(!db.reads.includes("pagos"));
+    assert.ok(!db.reads.includes("v_pago_imputaciones"));
   }
 });
 
 test("fallo de una lectura requerida impide entregar un archivo incompleto", async () => {
-  const db = database({ failure: "pagos" });
+  const db = database({ failure: "v_pago_imputaciones" });
   await assert.rejects(loadCommercialExport(db.client, "evento", fixtureId(1)), /todos los datos/);
 });
 

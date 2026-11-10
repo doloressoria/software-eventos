@@ -181,10 +181,10 @@ export default async function EventoFlujoDineroPage({
                       <Badge>{pago.moneda}</Badge>
                     </TableCell>
                     <TableCell>
-                      <RelationBadge
-                        cateringContratoId={pago.catering_contrato_id}
-                        eventoServicioId={pago.evento_servicio_id}
-                      />
+                      {pago.distribuido ? <Badge variant="neutral">Distribuido</Badge> : (
+                        <RelationBadge cateringContratoId={pago.catering_contrato_id}
+                          eventoServicioId={pago.evento_servicio_id} />
+                      )}
                     </TableCell>
                     <TableCell className="text-right font-medium text-slate-950">
                       <PagoImporte pago={pago} />

@@ -240,7 +240,7 @@ async function isActiveCatalogService(servicioId: string) {
 async function hasActivePagos(eventoServicioId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
-    .from("pagos")
+    .from("v_pago_imputaciones")
     .select("id")
     .eq("evento_servicio_id", eventoServicioId)
     .is("deleted_at", null)

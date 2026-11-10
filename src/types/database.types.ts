@@ -903,6 +903,66 @@ export type Database = {
           },
         ]
       }
+      pago_imputaciones: {
+        Row: {
+          catering_contrato_id: string | null
+          evento_servicio_id: string | null
+          id: string
+          importe_ars: number
+          pago_id: string
+        }
+        Insert: {
+          catering_contrato_id?: string | null
+          evento_servicio_id?: string | null
+          id?: string
+          importe_ars: number
+          pago_id: string
+        }
+        Update: {
+          catering_contrato_id?: string | null
+          evento_servicio_id?: string | null
+          id?: string
+          importe_ars?: number
+          pago_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pago_imputaciones_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "catering_contratos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pago_imputaciones_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "v_catering_acreditado"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pago_imputaciones_evento_servicio_id_fkey"
+            columns: ["evento_servicio_id"]
+            isOneToOne: false
+            referencedRelation: "evento_servicios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pago_imputaciones_evento_servicio_id_fkey"
+            columns: ["evento_servicio_id"]
+            isOneToOne: false
+            referencedRelation: "v_evento_servicios_acreditados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pago_imputaciones_pago_id_fkey"
+            columns: ["pago_id"]
+            isOneToOne: false
+            referencedRelation: "pagos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pagos: {
         Row: {
           banco: string | null
@@ -910,6 +970,7 @@ export type Database = {
           concepto: string | null
           created_at: string
           deleted_at: string | null
+          distribuido: boolean
           es_garantia: boolean
           evento_id: string | null
           evento_servicio_id: string | null
@@ -931,6 +992,7 @@ export type Database = {
           concepto?: string | null
           created_at?: string
           deleted_at?: string | null
+          distribuido?: boolean
           es_garantia?: boolean
           evento_id?: string | null
           evento_servicio_id?: string | null
@@ -952,6 +1014,7 @@ export type Database = {
           concepto?: string | null
           created_at?: string
           deleted_at?: string | null
+          distribuido?: boolean
           es_garantia?: boolean
           evento_id?: string | null
           evento_servicio_id?: string | null
@@ -1423,6 +1486,30 @@ export type Database = {
           },
         ]
       }
+      v_pago_imputaciones: {
+        Row: {
+          banco: string | null
+          catering_contrato_id: string | null
+          concepto: string | null
+          created_at: string | null
+          deleted_at: string | null
+          distribuido: boolean | null
+          es_garantia: boolean | null
+          evento_id: string | null
+          evento_servicio_id: string | null
+          fecha_pago: string | null
+          forma_pago: Database["public"]["Enums"]["forma_pago"] | null
+          id: string | null
+          importe_en_pesos: number | null
+          importe_moneda_original: number | null
+          moneda: Database["public"]["Enums"]["moneda"] | null
+          notas: string | null
+          numero_cheque: string | null
+          pago_id: string | null
+          tipo_cambio: number | null
+        }
+        Relationships: []
+      }
       v_resumen_evento: {
         Row: {
           cliente_nombre: string | null
@@ -1618,6 +1705,16 @@ export type Database = {
           p_datos: Json
           p_evento_id?: string
           p_version: string
+        }
+        Returns: string
+      }
+      guardar_pago_distribuido: {
+        Args: {
+          p_cabecera: Json
+          p_editar: boolean
+          p_evento: string
+          p_imputaciones: Json
+          p_pago: string
         }
         Returns: string
       }

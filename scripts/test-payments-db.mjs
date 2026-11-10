@@ -13,6 +13,7 @@ const usd = process.argv.includes("--usd");
 const contactos = process.argv.includes("--contactos");
 const balances = process.argv.includes("--balances");
 const catering = process.argv.includes("--catering");
+const imputaciones = process.argv.includes("--imputaciones");
 const cheques = process.argv.includes("--cheques");
 const expenses = process.argv.includes("--expenses");
 try {
@@ -25,7 +26,7 @@ try {
     "begin;",
     readFileSync("supabase/tests/fixtures/payments-schema.sql", "utf8"),
     readFileSync("supabase/tests/payments-setup.sql", "utf8"),
-    ...(cheques ? [
+    ...(cheques || imputaciones ? [
       "create role service_role nologin;",
       ...[
         "20261021145259_unblock_payments_and_summary_access",
@@ -36,7 +37,11 @@ try {
       ].map((name) => readFileSync(`supabase/migrations/${name}.sql`, "utf8")),
       readFileSync("supabase/tests/cheques-before.sql", "utf8"),
       readFileSync("supabase/migrations/20261110160147_acreditacion_cheques.sql", "utf8"),
+      ...(imputaciones ? [
+        readFileSync("supabase/migrations/20261110200716_imputaciones_cobros.sql", "utf8"),
+      ] : []),
       readFileSync("supabase/tests/cheques.sql", "utf8"),
+      ...(imputaciones ? [readFileSync("supabase/tests/imputaciones.sql", "utf8")] : []),
       "rollback;",
     ] : catering ? [
       readFileSync("supabase/migrations/20261021145259_unblock_payments_and_summary_access.sql", "utf8"),

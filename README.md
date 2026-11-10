@@ -301,3 +301,9 @@ de creación de roles al regenerarlos: esas restricciones no las expresa el gene
 El [runbook de cheques](docs/acreditacion-cheques.md) explica la fecha local,
 la diferencia con la fecha de contrato, las pruebas aisladas y el orden de
 aplicación en Supabase SQL Editor.
+
+### Imputaciones de cobros del evento
+
+El [runbook de imputaciones](docs/imputaciones-cobros.md) describe la
+compatibilidad con pagos históricos, el orden de publicación en SQL Editor
+y la prueba aislada `pnpm test:imputaciones:db`.

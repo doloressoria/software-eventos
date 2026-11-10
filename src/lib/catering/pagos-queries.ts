@@ -14,13 +14,15 @@ export type PagoCatering = Pick<
   | "forma_pago"
   | "id"
   | "importe_en_pesos"
-  | "importe_moneda_original"
   | "tipo_cambio"
   | "banco"
   | "numero_cheque"
   | "moneda"
   | "notas"
->;
+> & (
+  | { distribuido: true; importe_moneda_original: null }
+  | { distribuido: false; importe_moneda_original: number }
+);
 
 export type CateringIngresos = {
   estadoCobro: EstadoCobro;
@@ -36,9 +38,9 @@ export async function getCateringIngresos(
   const supabase = await createClient();
   const [pagosResult, cateringResult] = await Promise.all([
     supabase
-      .from("pagos")
+      .from("v_pago_imputaciones")
       .select(
-        "id, concepto, created_at, es_garantia, fecha_pago, forma_pago, importe_en_pesos, importe_moneda_original, moneda, tipo_cambio, banco, numero_cheque, notas",
+        "id, concepto, created_at, es_garantia, distribuido, fecha_pago, forma_pago, importe_en_pesos, importe_moneda_original, moneda, tipo_cambio, banco, numero_cheque, notas",
       )
       .eq("catering_contrato_id", cateringContratoId)
       .is("deleted_at", null)

@@ -90,19 +90,29 @@ export function CateringIngresosSection({
                     </TableCell>
                     <TableCell>{getFormaPagoLabel(pago.forma_pago)}</TableCell>
                     <TableCell className="text-right font-medium text-slate-950">
-                      <PagoImporte pago={pago} />
+                      {pago.distribuido ? (
+                        <span>{formatCurrency(pago.importe_en_pesos ?? 0)} imputados</span>
+                      ) : <PagoImporte pago={pago} />}
                     </TableCell>
                     <TableCell className="max-w-xs text-slate-500">
                       {pago.notas ?? "-"}
                     </TableCell>
                     <TableCell className="text-right">
-                      <details className="mb-3 text-left">
-                        <summary className="cursor-pointer text-sm">Editar pago</summary>
-                        <div className="min-w-72 p-3"><CateringPagoForm editing action={updateCateringPagoAction.bind(null, cateringId, pago.id)} initialState={getPagoEditState(pago)} /></div>
-                      </details>
-                      <DeleteCateringPagoForm
-                        action={deleteCateringPagoAction.bind(null, cateringId, pago.id)}
-                      />
+                      {pago.distribuido ? (
+                        <span className="text-sm">Se administra en Ingresos del evento</span>
+                      ) : (
+                        <>
+                          <details className="mb-3 text-left">
+                            <summary className="cursor-pointer text-sm">Editar pago</summary>
+                            <div className="min-w-72 p-3">
+                              <CateringPagoForm editing
+                                action={updateCateringPagoAction.bind(null, cateringId, pago.id)}
+                                initialState={getPagoEditState(pago)} />
+                            </div>
+                          </details>
+                          <DeleteCateringPagoForm action={deleteCateringPagoAction.bind(null, cateringId, pago.id)} />
+                        </>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

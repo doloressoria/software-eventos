@@ -4,7 +4,7 @@ import ExcelJS from "exceljs";
 import * as XLSX from "xlsx";
 import { buildCommercialWorkbook, exportFilename } from "./workbook";
 import { cateringAmounts, PARTIAL_NOTICE, SEPARATE_NOTICE } from "./calculations";
-import { exampleCatering, exampleEvent, examplePayment } from "./fixtures";
+import { exampleCatering, exampleEvent, examplePayment, fixtureId } from "./fixtures";
 
 function texts(book: ExcelJS.Workbook) {
   const result: string[] = [];
@@ -183,4 +183,22 @@ test("un cheque pendiente aparece separado con su registro y no reduce el saldo 
   assert.equal(amount(book, "CLIENTE", "Saldo servicios — detalle (deuda menos cobros)", 7), 11420);
   assert.ok(texts(book).includes("CHEQUES PENDIENTES — NO APLICADOS AL SALDO"));
   assert.ok(texts(book).some((text) => text.startsWith("Pendiente · Registrado: 2026-10-19")));
+});
+
+test("el Excel separa las imputaciones acreditadas de un único cobro", async () => {
+  const data = exampleEvent(0);
+  const { catering } = exampleCatering();
+  const common = { pago_id: fixtureId(99), forma_pago: "cheque" as const,
+    fecha_pago: "2026-01-01", importe_moneda_original: null };
+  data.payments = [
+    { ...examplePayment(1, data.services[0].id), ...common, importe_en_pesos: 250000 },
+    { ...examplePayment(3, data.services[1].id), ...common, importe_en_pesos: 50000 },
+  ];
+  data.caterings = [{ catering, payments: [{
+    ...examplePayment(5, null, catering.id), ...common, importe_en_pesos: 700000,
+  }] }];
+  const book = await buildCommercialWorkbook(data);
+  assert.equal(amount(book, "CLIENTE", "Cobros ordinarios de servicios", 7), 300000);
+  assert.equal(amount(book, "Catering", "Cobros ordinarios registrados", 7), 700000);
+  assert.equal(texts(book).filter((value) => value.includes(`Imputación del cobro ${common.pago_id}`)).length, 3);
 });

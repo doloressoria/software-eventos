@@ -20,14 +20,43 @@ export type PagoFormFields = {
   es_garantia: string;
   fecha_pago: string;
   forma_pago: string;
-  evento_servicio_id: string;
   concepto: string;
   notas: string;
 };
 
 export type PagoFormErrors = Partial<Record<keyof PagoFormFields, string>>;
 
+export type ImputacionInput = { destino: string; importe: string };
+export type ImputacionDestino = { value: string; label: string; saldoPendiente: number };
+
+const uuid = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
+
+export function validateImputaciones(form: FormData, equivalente: number | null) {
+  const destinos = form.getAll("destino");
+  const importes = form.getAll("importe_ars");
+  const fields = destinos.slice(0, 50).map((value, index) => ({
+    destino: typeof value === "string" ? value.toLowerCase() : "",
+    importe: typeof importes[index] === "string" ? importes[index] : "",
+  }));
+  const lines = fields.map(({ destino, importe }) => {
+    const [tipo, id, extra] = destino.split(":");
+    const monto = parsePaymentDecimal(importe, 2, 10);
+    if (extra !== undefined || !id || !uuid.test(id) || monto === null) return null;
+    if (tipo === "servicio") return { evento_servicio_id: id, importe_ars: monto };
+    if (tipo === "catering") return { catering_contrato_id: id, importe_ars: monto };
+    return null;
+  });
+  const total = lines.reduce((sum, line) => sum + Math.round((line?.importe_ars ?? 0) * 100), 0);
+  const valid = destinos.length > 0 && destinos.length <= 50 && destinos.length === importes.length &&
+    new Set(fields.map((line) => line.destino)).size === fields.length && lines.every((line) => line !== null) &&
+    equivalente !== null && total === Math.round(equivalente * 100);
+  const requestId = getString(form, "solicitud");
+  return { fields, lines: valid ? lines : null, requestId: uuid.test(requestId) ? requestId : null };
+}
+
 export type PagoFormState = {
+  imputaciones?: ImputacionInput[];
+  solicitudConfirmada?: string;
   fields: PagoFormFields;
   errors: PagoFormErrors;
   formError: string | null;
@@ -43,7 +72,6 @@ export type PagoPayload = {
   es_garantia: boolean;
   fecha_pago: string;
   forma_pago: (typeof pagoFormaPagoOptions)[number];
-  evento_servicio_id: string | null;
   concepto: string | null;
   notas: string | null;
 };
@@ -59,7 +87,6 @@ export function getEmptyPagoFormState(): PagoFormState {
       es_garantia: "",
       fecha_pago: getArgentinaPaymentDay(),
       forma_pago: "transferencia",
-      evento_servicio_id: "",
       concepto: "",
       notas: "",
     },
@@ -132,7 +159,6 @@ export function validatePagoForm(formData: FormData): {
       es_garantia: fields.es_garantia === "on",
       fecha_pago: fechaPago,
       forma_pago: formaPagoPermitida,
-      evento_servicio_id: nullableSelectValue(fields.evento_servicio_id),
       concepto: nullableTrim(fields.concepto),
       notas: nullableTrim(fields.notas),
     },
@@ -149,7 +175,6 @@ function getPagoFields(formData: FormData): PagoFormFields {
     es_garantia: getString(formData, "es_garantia"),
     fecha_pago: getString(formData, "fecha_pago"),
     forma_pago: getString(formData, "forma_pago"),
-    evento_servicio_id: getString(formData, "evento_servicio_id"),
     concepto: getString(formData, "concepto"),
     notas: getString(formData, "notas"),
   };
@@ -182,14 +207,14 @@ export function paymentEquivalent(amount: string, rate: string): number | null {
 export function getPagoEditState(pago: {
   importe_moneda_original: number; moneda: string; tipo_cambio: number | null;
   forma_pago: string; fecha_pago: string; banco: string | null; numero_cheque: string | null;
-  es_garantia: boolean; concepto: string | null; notas: string | null; evento_servicio_id?: string | null;
+  es_garantia: boolean; concepto: string | null; notas: string | null;
 }): PagoFormState {
   return { ...getEmptyPagoFormState(), fields: {
     monto: String(pago.importe_moneda_original), moneda: pago.moneda,
     tipo_cambio: pago.tipo_cambio === null ? "" : String(pago.tipo_cambio),
     forma_pago: pago.forma_pago, fecha_pago: pago.fecha_pago, banco: pago.banco ?? "",
     numero_cheque: pago.numero_cheque ?? "", es_garantia: pago.es_garantia ? "on" : "",
-    concepto: pago.concepto ?? "", notas: pago.notas ?? "", evento_servicio_id: pago.evento_servicio_id ?? "",
+    concepto: pago.concepto ?? "", notas: pago.notas ?? "",
   } };
 }
 
@@ -201,16 +226,6 @@ function nullableTrim(value: string) {
   const trimmed = value.trim();
 
   return trimmed || null;
-}
-
-function nullableSelectValue(value: string) {
-  const trimmed = value.trim();
-
-  if (!trimmed || trimmed === "sin_asociar") {
-    return null;
-  }
-
-  return trimmed;
 }
 
 function isDateInputValue(value: string) {

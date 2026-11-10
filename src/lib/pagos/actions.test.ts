@@ -9,7 +9,12 @@ import * as calculos from "./calculos";
 function setup(catering: boolean, options: { denied?: boolean; failure?: boolean; external?: boolean } = {}) {
   const writes: { table: string; mode: string; values: Record<string, unknown>; filters: string[] }[] = [];
   const invalidations: string[] = [];
-  const db = { from(table: string) {
+  const db = {
+    rpc(name: string, values: Record<string, unknown>) {
+      writes.push({ table: name, mode: "rpc", values, filters: [] });
+      return Promise.resolve({ data: options.failure ? null : "payment", error: options.failure ? { code: "23514" } : null });
+    },
+    from(table: string) {
     let write: typeof writes[number] | undefined;
     const filters: string[] = [];
     const chain = {
@@ -45,7 +50,12 @@ function setup(catering: boolean, options: { denied?: boolean; failure?: boolean
 
 function form() {
   const data = new FormData();
-  for (const [k,v] of Object.entries({ ...validation.getEmptyPagoFormState().fields, monto: "100.25", moneda: "USD", tipo_cambio: "1200.1234", forma_pago: "transferencia", banco: "Banco histórico", evento_servicio_id: "service", es_garantia: "on" })) data.set(k,v);
+  for (const [k,v] of Object.entries({ ...validation.getEmptyPagoFormState().fields, monto: "100.25", moneda: "USD", tipo_cambio: "1200.1234", forma_pago: "transferencia", banco: "Banco histórico", es_garantia: "on" })) data.set(k,v);
+  data.set("solicitud", "00000000-0000-4000-8000-000000000001");
+  data.append("destino", "servicio:00000000-0000-4000-8000-000000000002");
+  data.append("importe_ars", "60000");
+  data.append("destino", "catering:00000000-0000-4000-8000-000000000003");
+  data.append("importe_ars", (validation.paymentEquivalent("100.25", "1200.1234")! - 60000).toFixed(2));
   return data;
 }
 
@@ -58,21 +68,28 @@ for (const mode of ["evento", "catering asociado", "catering externo"]) {
       const args = [catering ? "contract" : "event", ...(editing ? ["payment"] : []), validation.getEmptyPagoFormState(), form()];
       const result = await s.exports[name](...args);
       assert.ok(result.successMessage);
-      const write = s.writes.find(w => w.table === "pagos")!;
-      assert.equal(write.values.importe_moneda_original, 100.25);
-      assert.equal(write.values.tipo_cambio, 1200.1234);
-      assert.equal(write.values.moneda, "USD");
-      assert.equal(write.values.banco, "Banco histórico");
-      assert.equal(write.values.es_garantia, true);
-      assert.equal("importe_en_pesos" in write.values, false);
-      if (editing) {
+      const [write] = s.writes;
+      assert.equal(s.writes.length, 1);
+      assert.equal(write.table, catering ? "pagos" : "guardar_pago_distribuido");
+      const header = catering ? write.values : write.values.p_cabecera as Record<string, unknown>;
+      assert.equal(header.importe_moneda_original, 100.25);
+      assert.equal(header.tipo_cambio, 1200.1234);
+      assert.equal(header.moneda, "USD");
+      assert.equal(header.banco, "Banco histórico");
+      assert.equal(header.es_garantia, true);
+      assert.equal("importe_en_pesos" in header, false);
+      if (!catering) {
+        assert.equal(write.values.p_evento, "event");
+        assert.equal(write.values.p_editar, editing);
+        assert.equal(write.values.p_pago, editing ? "payment" : form().get("solicitud"));
+        assert.equal((write.values.p_imputaciones as unknown[]).length, 2);
+      } else if (editing) {
         assert.ok(write.filters.includes("id=payment"));
         assert.ok(write.filters.includes("deleted_at=null"));
-        assert.ok(write.filters.includes(catering ? "catering_contrato_id=contract" : "evento_id=event"));
-        assert.equal("registrado_por" in write.values, false);
+        assert.ok(write.filters.includes("catering_contrato_id=contract"));
+        assert.equal("registrado_por" in header, false);
       }
-      if (mode === "catering externo") assert.equal(write.values.evento_id, null);
-      assert.deepEqual(s.writes.map(w => w.table), ["pagos"]);
+      if (mode === "catering externo") assert.equal(header.evento_id, null);
     }
   });
   test(`${mode}: acceso denegado no escribe; error SQL conserva el borrador`, async () => {
@@ -95,3 +112,15 @@ for (const mode of ["evento", "catering asociado", "catering externo"]) {
     assert.deepEqual(s.writes.map(w => w.table), ["pagos"]);
   });
 }
+
+test("el servidor no envía la RPC si falta un centavo", async () => {
+  const s = setup(false);
+  const data = form();
+  data.delete("importe_ars");
+  data.append("importe_ars", "60000");
+  data.append("importe_ars", (validation.paymentEquivalent("100.25", "1200.1234")! - 60000.01).toFixed(2));
+  const result = await s.exports.createPagoAction("event", validation.getEmptyPagoFormState(), data);
+  assert.match(result.formError ?? "", /al centavo/);
+  assert.equal(result.imputaciones?.length, 2);
+  assert.equal(s.writes.length, 0);
+});

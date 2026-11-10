@@ -4,7 +4,7 @@ import { ExportError, type CommercialExportData, type ExportCatering, type Expor
 
 type Client = SupabaseClient<Database>;
 type Screen = "eventos" | "catering";
-const paymentColumns = "id, evento_id, evento_servicio_id, catering_contrato_id, concepto, created_at, fecha_pago, forma_pago, moneda, banco, numero_cheque, importe_moneda_original, tipo_cambio, importe_en_pesos, es_garantia, deleted_at, notas";
+const paymentColumns = "id, pago_id, evento_id, evento_servicio_id, catering_contrato_id, concepto, created_at, fecha_pago, forma_pago, moneda, banco, numero_cheque, importe_moneda_original, tipo_cambio, importe_en_pesos, es_garantia, deleted_at, notas";
 const cateringColumns = "*, usuarios!catering_contratos_ejecutiva_id_fkey(full_name,email), salones(nombre)";
 
 // Rebuild each page query: PostgREST's response limit must never truncate an export.
@@ -46,7 +46,7 @@ export async function loadCommercialExport(client: Client, kind: "evento" | "cat
   const contacts = (eventId: string) => allRows((start, end) => client.from("evento_contactos")
     .select("nombre,telefono,correo,relacion,observaciones,es_principal")
     .eq("evento_id", eventId).is("deleted_at", null).order("id").range(start, end));
-  const cateringPayments = (contract: ExportCatering) => allRows((start, end) => client.from("pagos").select(paymentColumns)
+  const cateringPayments = (contract: ExportCatering) => allRows((start, end) => client.from("v_pago_imputaciones").select(paymentColumns)
     .eq("catering_contrato_id", contract.id).is("deleted_at", null).order("fecha_pago").order("id").range(start, end))
     .then((rows) => rows.filter((p) => p.evento_id === contract.evento_id && p.evento_servicio_id === null) as ExportPayment[]);
 
@@ -55,7 +55,7 @@ export async function loadCommercialExport(client: Client, kind: "evento" | "cat
     const services = await allRows((start, end) => client.from("v_evento_servicios_acreditados").select("*,servicios_catalogo(nombre,categoria)").eq("evento_id", id).order("created_at").order("id").range(start, end)) as ExportService[];
     const serviceIds = new Set(services.map((s) => s.id));
     const [payments, currentContacts] = await Promise.all([
-      allRows((start, end) => client.from("pagos").select(paymentColumns).eq("evento_id", id)
+      allRows((start, end) => client.from("v_pago_imputaciones").select(paymentColumns).eq("evento_id", id)
         .not("evento_servicio_id", "is", null).is("catering_contrato_id", null).is("deleted_at", null)
         .order("fecha_pago").order("id").range(start, end)),
       contacts(id),

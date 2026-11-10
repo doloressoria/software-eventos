@@ -8,16 +8,9 @@ import {
   Label,
   Textarea,
 } from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import type { PagoFormState } from "@/lib/pagos/validation";
+import type { ImputacionDestino, PagoFormState } from "@/lib/pagos/validation";
 import { PagoMoneyFields } from "@/components/pagos/pago-money-fields";
-import type { EventoServicioPagoOption } from "@/lib/evento-servicios/queries";
+import { PagoImputacionesFields } from "@/components/pagos/pago-imputaciones-fields";
 
 type PagoFormProps = {
   action: (
@@ -25,28 +18,39 @@ type PagoFormProps = {
     formData: FormData,
   ) => Promise<PagoFormState>;
   initialState: PagoFormState;
-  servicios?: EventoServicioPagoOption[];
+  destinos?: ImputacionDestino[];
   editing?: boolean;
 };
 
-export function PagoForm({ action, initialState, servicios, editing = false }: PagoFormProps) {
+export function PagoForm({ action, initialState, destinos, editing = false }: PagoFormProps) {
+  const requestInput = useRef<HTMLInputElement>(null);
+  const requestId = useRef<string | null>(null);
   const [state, formAction] = useActionState(action, initialState);
   const id = useId();
   const formRef = useRef<HTMLFormElement>(null);
-  const eventoServicioValue = state.successMessage && !editing
-    ? initialState.fields.evento_servicio_id || "sin_asociar"
-    : state.fields.evento_servicio_id || "sin_asociar";
 
   useEffect(() => {
     if (state.successMessage && !editing) {
+      if (requestId.current === state.solicitudConfirmada) requestId.current = null;
       formRef.current?.reset();
     }
-  }, [state.successMessage, editing]);
+  }, [state, editing]);
 
   return (
-    <form ref={formRef} action={formAction} className="space-y-5" noValidate>
+    <form ref={formRef} action={formAction} className="space-y-5" noValidate onSubmit={() => {
+      const input = requestInput.current;
+      if (input) {
+        requestId.current ??= crypto.randomUUID();
+        input.value = requestId.current;
+      }
+    }}>
+      {destinos && !editing && <input type="hidden" name="solicitud" ref={requestInput} />}
       <div className="grid gap-5 md:grid-cols-2">
-        <PagoMoneyFields key={JSON.stringify([state.fields, state.successMessage])} state={state} />
+        <PagoMoneyFields key={JSON.stringify([state.fields, state.imputaciones, state.solicitudConfirmada, state.successMessage])} state={state}>
+          {destinos ? (equivalent) => (
+            <PagoImputacionesFields destinos={destinos} initial={state.imputaciones} equivalent={equivalent} />
+          ) : undefined}
+        </PagoMoneyFields>
 
         <div>
           <Label htmlFor={`${id}-concepto`}>Concepto</Label>
@@ -57,31 +61,6 @@ export function PagoForm({ action, initialState, servicios, editing = false }: P
             defaultValue={state.fields.concepto}
           />
         </div>
-
-        {servicios && (
-        <div className="md:col-span-2">
-          <Label htmlFor={`${id}-evento_servicio_id`}>Servicio asociado</Label>
-          <Select
-            name="evento_servicio_id"
-            defaultValue={eventoServicioValue}
-            key={`servicio-${eventoServicioValue}`}
-          >
-            <SelectTrigger id={`${id}-evento_servicio_id`}>
-              <SelectValue placeholder="Asignar automaticamente" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="sin_asociar">
-                Asignar automaticamente
-              </SelectItem>
-              {servicios.map((servicio) => (
-                <SelectItem key={servicio.id} value={servicio.id}>
-                  {servicio.label} · saldo {formatCurrency(servicio.saldoPendiente)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        )}
 
         <div className="md:col-span-2">
           <Label htmlFor={`${id}-notas`}>Notas</Label>
@@ -106,12 +85,4 @@ export function PagoForm({ action, initialState, servicios, editing = false }: P
       </div>
     </form>
   );
-}
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("es-AR", {
-    currency: "ARS",
-    maximumFractionDigits: 2,
-    style: "currency",
-  }).format(value);
 }

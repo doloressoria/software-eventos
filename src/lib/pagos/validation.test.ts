@@ -47,7 +47,7 @@ test("igual equivalente ARS tiene igual IVA en efectivo ARS/USD y transferencia 
 });
 
 test("edición recupera datos históricos sin inventar una cotización ausente", () => {
-  const historical = { importe_moneda_original: 100, moneda: "USD", tipo_cambio: 1300, forma_pago: "transferencia", fecha_pago: "2026-10-21", banco: "Original", numero_cheque: null, es_garantia: true, concepto: "Pago", notas: "Referencia", evento_servicio_id: "servicio" };
+  const historical = { importe_moneda_original: 100, moneda: "USD", tipo_cambio: 1300, forma_pago: "transferencia", fecha_pago: "2026-10-21", banco: "Original", numero_cheque: null, es_garantia: true, concepto: "Pago", notas: "Referencia" };
   const state = getPagoEditState(historical);
   const data = new FormData();
   for (const [k,v] of Object.entries(state.fields)) data.set(k,v);

@@ -99,7 +99,7 @@ function pendingCheques(payments: ExportPayment[]) {
 function paymentBlock(sheet: Sheet, source: Sheet, start: number, title: string, payments: ExportPayment[], debt?: number, columns = 7) {
   let r = start;
   band(sheet, source, r++, title, columns);
-  const headers = ["Medio y moneda", "Pago / acreditación", "Banco", "N° cheque", "Importe original", "Cotización ARS", "Equivalente ARS"];
+  const headers = ["Medio y moneda", "Pago / acreditación", "Banco", "N° cheque", "Importe original", "Cotización ARS", "Importe ARS"];
   row(sheet, source, r++, source.name === "DC" ? 36 : 42, headers, columns);
   for (const payment of uniquePayments(payments)) {
     row(sheet, source, r, source.name === "DC" ? 37 : 43,
@@ -112,7 +112,9 @@ function paymentBlock(sheet: Sheet, source: Sheet, start: number, title: string,
     const registro = payment.forma_pago === "cheque"
       ? `${isChequePending(payment) ? "Pendiente" : "Acreditado"} · Registrado: ${getArgentinaPaymentDay(new Date(payment.created_at))}`
       : null;
-    if (registro || payment.concepto || payment.notas) note(sheet, source, r++, [registro, payment.concepto, payment.notas].filter(Boolean).join(" · "), columns);
+    const imputacion = payment.pago_id && payment.pago_id !== payment.id ? `Imputación del cobro ${payment.pago_id}` : null;
+    const details = [registro, imputacion, payment.concepto, payment.notas].filter(Boolean);
+    if (details.length) note(sheet, source, r++, details.join(" · "), columns);
     if (payment.importe_en_pesos === null && payment.moneda !== "ARS") note(sheet, source, r++, "Este pago no tiene equivalente en pesos guardado. No se convirtió automáticamente.", columns);
   }
   if (!payments.length) note(sheet, source, r++, "Sin pagos registrados.", columns);

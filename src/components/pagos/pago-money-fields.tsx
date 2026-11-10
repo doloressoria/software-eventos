@@ -1,12 +1,15 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { DatePickerField } from "@/components/ui/date-picker-field";
 import { FieldError, Input, Label } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { pagoFormaPagoOptions, paymentEquivalent, type PagoFormState } from "@/lib/pagos/validation";
 
-export function PagoMoneyFields({ state }: { state: PagoFormState }) {
+export function PagoMoneyFields({ state, children }: {
+  state: PagoFormState;
+  children?: (equivalent: number | null) => ReactNode;
+}) {
   const id = useId();
   const [moneda, setMoneda] = useState(state.fields.moneda);
   const [forma, setForma] = useState(state.fields.forma_pago);
@@ -77,5 +80,6 @@ export function PagoMoneyFields({ state }: { state: PagoFormState }) {
       <label htmlFor={`${id}-garantia`} className="flex items-center gap-2 text-sm"><input id={`${id}-garantia`} type="checkbox" name="es_garantia" aria-invalid={Boolean(state.errors.es_garantia)} aria-describedby={state.errors.es_garantia ? `${id}-garantia-error` : undefined} defaultChecked={state.fields.es_garantia === "on"} /> Garantía (no reduce deuda ni cuenta como cobro)</label>
       {state.errors.es_garantia && <FieldError id={`${id}-garantia-error`}>{state.errors.es_garantia}</FieldError>}
     </div>
+    {children?.(equivalent)}
   </>;
 }

@@ -1,6 +1,4 @@
 import { PagoFechas } from "@/components/pagos/pago-fechas";
-import { updateCateringPagoAction } from "@/app/(protected)/catering/actions";
-import { CateringPagoForm } from "@/components/catering/catering-pago-form";
 import { PagoImporte } from "@/components/pagos/pago-importe";
 import { createPagoAction, deletePagoAction, updatePagoAction } from "@/app/(protected)/pagos/actions";
 import { DeletePagoForm } from "@/components/pagos/delete-pago-form";
@@ -23,7 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getEmptyPagoFormState, getPagoEditState } from "@/lib/pagos/validation";
-import type { EventoIngresos, EstadoCobro } from "@/lib/pagos/queries";
+import type { EventoIngresos, EstadoCobro, PagoEvento } from "@/lib/pagos/queries";
 import type { EventoServicioPagoOption } from "@/lib/evento-servicios/queries";
 
 type IngresosEventoSectionProps = {
@@ -37,6 +35,13 @@ export function IngresosEventoSection({
   ingresos,
   servicios,
 }: IngresosEventoSectionProps) {
+  const destinos = [
+    ...servicios.map((servicio) => ({
+      value: `servicio:${servicio.id}`, label: servicio.label, saldoPendiente: servicio.saldoPendiente,
+    })),
+    ...ingresos.cateringDestinos,
+  ];
+  const labels = new Map(destinos.map((d) => [d.value, d.label]));
   return (
     <Card>
       <CardHeader className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
@@ -74,7 +79,7 @@ export function IngresosEventoSection({
                   <TableHead>Fecha de registro</TableHead>
                   <TableHead>Pago / acreditación</TableHead>
                   <TableHead>Concepto</TableHead>
-                  <TableHead>Servicio</TableHead>
+                  <TableHead>Imputaciones</TableHead>
                   <TableHead>Forma</TableHead>
                   <TableHead className="text-right">Importe y equivalente ARS</TableHead>
                   <TableHead>Notas</TableHead>
@@ -82,45 +87,57 @@ export function IngresosEventoSection({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {ingresos.pagos.map((pago) => (
-                  <TableRow key={pago.id}>
-                    <PagoFechas pago={pago} />
-                    <TableCell className="font-medium text-slate-950">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span>{pago.concepto ?? "-"}</span>
-                        {pago.es_garantia ? (
-                          <Badge variant="warning">Garantia</Badge>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {pago.evento_servicios?.servicios_catalogo?.nombre ??
-                        "-"}
-                    </TableCell>
-                    <TableCell>{getFormaPagoLabel(pago.forma_pago)}</TableCell>
-                    <TableCell className="text-right font-medium text-slate-950">
-                      <PagoImporte pago={pago} />
-                    </TableCell>
-                    <TableCell className="max-w-xs text-slate-500">
-                      {pago.notas ?? "-"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <details className="mb-3 text-left">
-                        <summary className="cursor-pointer text-sm">Editar pago</summary>
-                        <div className="min-w-72 p-3">
-                          {pago.catering_contrato_id ? <CateringPagoForm editing action={updateCateringPagoAction.bind(null, pago.catering_contrato_id, pago.id)} initialState={getPagoEditState(pago)} /> : <PagoForm editing action={updatePagoAction.bind(null, eventoId, pago.id)} initialState={getPagoEditState(pago)} servicios={servicios} />}
+                {ingresos.pagos.map((pago) => {
+                  const lineas = lineasPago(pago);
+                  return (
+                    <TableRow key={pago.id}>
+                      <PagoFechas pago={pago} />
+                      <TableCell className="font-medium text-slate-950">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span>{pago.concepto ?? "-"}</span>
+                          {pago.es_garantia ? (
+                            <Badge variant="warning">Garantia</Badge>
+                          ) : null}
                         </div>
-                      </details>
-                      <DeletePagoForm
-                        action={deletePagoAction.bind(
-                          null,
-                          eventoId,
-                          pago.id,
+                      </TableCell>
+                      <TableCell>
+                        {lineas.length === 0 ? "Sin imputación" : (
+                          <ul className="space-y-1">
+                            {lineas.map((linea) => (
+                              <li key={linea.destino}>
+                                {labels.get(linea.destino) ?? "Destino del pago"}
+                                {linea.importe && ` · ${formatCurrency(Number(linea.importe))}`}
+                              </li>
+                            ))}
+                          </ul>
                         )}
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>{getFormaPagoLabel(pago.forma_pago)}</TableCell>
+                      <TableCell className="text-right font-medium text-slate-950">
+                        <PagoImporte pago={pago} />
+                      </TableCell>
+                      <TableCell className="max-w-xs text-slate-500">
+                        {pago.notas ?? "-"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <details className="mb-3 text-left">
+                          <summary className="cursor-pointer text-sm">Editar pago</summary>
+                          <div className="min-w-72 p-3">
+                            <PagoForm editing action={updatePagoAction.bind(null, eventoId, pago.id)}
+                              initialState={{ ...getPagoEditState(pago), imputaciones: lineas }} destinos={destinos} />
+                          </div>
+                        </details>
+                        <DeletePagoForm
+                          action={deletePagoAction.bind(
+                            null,
+                            eventoId,
+                            pago.id,
+                          )}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           ) : (
@@ -136,11 +153,10 @@ export function IngresosEventoSection({
             Registrar nuevo pago
           </h3>
           <div className="mt-4">
-            <PagoForm
-              action={createPagoAction.bind(null, eventoId)}
-              initialState={getEmptyPagoFormState()}
-              servicios={servicios}
-            />
+            {destinos.length ? (
+              <PagoForm action={createPagoAction.bind(null, eventoId)}
+                initialState={getEmptyPagoFormState()} destinos={destinos} />
+            ) : <p className="text-sm">Agregá un servicio o vinculá un catering para registrar un cobro.</p>}
           </div>
         </div>
       </CardContent>
@@ -200,4 +216,17 @@ function getFormaPagoLabel(value: string) {
   };
 
   return labels[value] ?? value;
+}
+
+function lineasPago(pago: PagoEvento) {
+  if (pago.pago_imputaciones.length) {
+    return pago.pago_imputaciones.map((linea) => ({
+      destino: linea.evento_servicio_id
+        ? `servicio:${linea.evento_servicio_id}` : `catering:${linea.catering_contrato_id}`,
+      importe: String(linea.importe_ars),
+    }));
+  }
+  const destino = pago.evento_servicio_id ? `servicio:${pago.evento_servicio_id}`
+    : pago.catering_contrato_id ? `catering:${pago.catering_contrato_id}` : null;
+  return destino ? [{ destino, importe: pago.importe_en_pesos?.toString() ?? "" }] : [];
 }

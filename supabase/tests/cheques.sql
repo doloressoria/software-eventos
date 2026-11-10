@@ -1,6 +1,6 @@
 select pg_temp.check_true((select total_pagado = 100 from evento_servicios where id = pg_temp.id(51))
   and not exists (select 1 from pagos p join cheques_historicos h using(id)
-    where to_jsonb(p) is distinct from to_jsonb(h)),
+    where (to_jsonb(p) - 'distribuido') is distinct from to_jsonb(h)),
   'migración conserva filas y fechas históricas; sólo excluye el cheque futuro del cobrado');
 
 select pg_temp.check_true(

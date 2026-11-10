@@ -6,6 +6,8 @@ import { getAuthorizedActiveEvento, getCurrentProfile } from "@/lib/auth";
 import {
   getEmptyPagoFormState,
   type PagoFormState,
+  paymentEquivalent,
+  validateImputaciones,
   validatePagoForm,
 } from "@/lib/pagos/validation";
 import { createClient } from "@/lib/supabase/server";
@@ -40,6 +42,10 @@ async function savePago(eventoId: string, pagoId: string | null, formData: FormD
   }
 
   const { state, payload } = validatePagoForm(formData);
+  const { fields, lines, requestId } = validateImputaciones(formData, paymentEquivalent(
+    state.fields.monto, state.fields.moneda === "ARS" ? "1" : state.fields.tipo_cambio,
+  ));
+  state.imputaciones = fields;
 
   if (!payload) {
     return state;
@@ -54,26 +60,15 @@ async function savePago(eventoId: string, pagoId: string | null, formData: FormD
     };
   }
 
-  const eventoServicioId =
-    payload.evento_servicio_id ??
-    (await getEventoServicioConMayorSaldo(evento.id));
-
-  if (
-    eventoServicioId &&
-    !(await isEventoServicioForEvento(eventoServicioId, evento.id))
-  ) {
-    return {
-      ...state,
-      formError: CREATE_PAGO_ERROR,
-    };
+  const id = pagoId ?? requestId;
+  if (!lines || !id) {
+    return { ...state, formError: "Elegí destinos distintos y distribuí el equivalente en ARS al centavo." };
   }
 
   const supabase = await createClient();
   const values = {
     concepto: payload.concepto,
     es_garantia: payload.es_garantia,
-    evento_id: evento.id,
-    evento_servicio_id: eventoServicioId,
     fecha_pago: payload.fecha_pago,
     forma_pago: payload.forma_pago,
     importe_moneda_original: payload.monto,
@@ -83,18 +78,21 @@ async function savePago(eventoId: string, pagoId: string | null, formData: FormD
     numero_cheque: payload.numero_cheque,
     notas: payload.notas,
   };
-  const mutation = pagoId
-    ? supabase.from("pagos").update(values).eq("id", pagoId).eq("evento_id", evento.id)
-      .is("catering_contrato_id", null).is("deleted_at", null)
-    : supabase.from("pagos").insert({ ...values, registrado_por: profile.id });
-  const { data, error } = await mutation.select("id").maybeSingle();
+  const { data, error } = await supabase.rpc("guardar_pago_distribuido", {
+    p_evento: evento.id,
+    p_pago: id,
+    p_editar: pagoId !== null,
+    p_cabecera: values,
+    p_imputaciones: lines,
+  });
 
   if (error) {
-    logSupabaseError("createPagoAction insertar pago", error);
-    return {
-      ...state,
-      formError: "No se pudo registrar el pago. Intenta nuevamente.",
-    };
+    logSupabaseError("guardar pago distribuido", { code: error.code });
+    const formError = {
+      "23505": "Ese intento ya se guardó. Recargá Ingresos antes de registrar otro cobro.",
+      "23514": "Revisá que los destinos sigan activos y pertenezcan al evento.",
+    }[error.code] ?? CREATE_PAGO_ERROR;
+    return { ...state, formError };
   }
 
   if (!data) {
@@ -107,7 +105,7 @@ async function savePago(eventoId: string, pagoId: string | null, formData: FormD
   revalidateEventoPaths(evento.id);
 
   return {
-    ...(pagoId ? state : getEmptyPagoFormState()),
+    ...(pagoId ? state : { ...getEmptyPagoFormState(), solicitudConfirmada: id }),
     successMessage: pagoId ? "Pago actualizado correctamente." : "Pago registrado correctamente.",
   };
 }
@@ -166,49 +164,11 @@ export async function deletePagoAction(
   return {};
 }
 
-async function isEventoServicioForEvento(
-  eventoServicioId: string,
-  eventoId: string,
-) {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("evento_servicios")
-    .select("id")
-    .eq("id", eventoServicioId)
-    .eq("evento_id", eventoId)
-    .maybeSingle();
-
-  if (error) {
-    logSupabaseError("pagos validar servicio del evento", error);
-    return false;
-  }
-
-  return Boolean(data);
-}
-
-async function getEventoServicioConMayorSaldo(eventoId: string) {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("v_evento_servicios_acreditados")
-    .select("id")
-    .eq("evento_id", eventoId)
-    .gt("saldo_pendiente", 0)
-    .order("saldo_pendiente", { ascending: false })
-    .order("id")
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    logSupabaseError("pagos obtener servicios para asignacion automatica", error);
-  }
-
-  return data?.id ?? null;
-}
-
 function revalidateEventoPaths(eventoId: string) {
   revalidatePath("/eventos");
   revalidatePath(`/eventos/${eventoId}`);
   revalidatePath(`/eventos/${eventoId}/ingresos`);
   revalidatePath(`/eventos/${eventoId}/flujo-dinero`);
   revalidatePath("/reportes", "layout");
+  revalidatePath("/catering", "layout");
 }

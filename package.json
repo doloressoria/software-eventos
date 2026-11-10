@@ -17,6 +17,7 @@
     "test:db": "node scripts/test-payments-db.mjs",
     "test:contactos:db": "node scripts/test-payments-db.mjs --contactos",
     "test:balances:db": "node scripts/test-payments-db.mjs --balances",
+    "test:imputaciones:db": "node scripts/test-payments-db.mjs --imputaciones",
     "test:cheques:db": "node scripts/test-payments-db.mjs --cheques",
     "test:catering:db": "node scripts/test-payments-db.mjs --catering",
     "test:egresos:db": "node scripts/test-payments-db.mjs --expenses",
