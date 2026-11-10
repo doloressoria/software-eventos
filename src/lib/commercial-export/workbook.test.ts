@@ -169,3 +169,18 @@ test("un pago USD sin equivalente histórico se muestra ausente, con subtotal pa
   assert.ok(found);
   assert.ok(texts(book).includes("Subtotal con equivalente ARS disponible — parcial"));
 });
+
+test("un cheque pendiente aparece separado con su registro y no reduce el saldo exportado", async () => {
+  const data = exampleEvent(0);
+  data.payments = [{
+    ...examplePayment(1, data.services[0].id),
+    forma_pago: "cheque",
+    fecha_pago: "2099-11-11",
+    importe_en_pesos: 726,
+  }];
+  const book = await buildCommercialWorkbook(data);
+  assert.equal(amount(book, "CLIENTE", "Cobros ordinarios de servicios", 7), 0);
+  assert.equal(amount(book, "CLIENTE", "Saldo servicios — detalle (deuda menos cobros)", 7), 11420);
+  assert.ok(texts(book).includes("CHEQUES PENDIENTES — NO APLICADOS AL SALDO"));
+  assert.ok(texts(book).some((text) => text.startsWith("Pendiente · Registrado: 2026-10-19")));
+});

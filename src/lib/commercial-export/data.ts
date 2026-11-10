@@ -4,7 +4,7 @@ import { ExportError, type CommercialExportData, type ExportCatering, type Expor
 
 type Client = SupabaseClient<Database>;
 type Screen = "eventos" | "catering";
-const paymentColumns = "id, evento_id, evento_servicio_id, catering_contrato_id, concepto, fecha_pago, forma_pago, moneda, banco, numero_cheque, importe_moneda_original, tipo_cambio, importe_en_pesos, es_garantia, deleted_at, notas";
+const paymentColumns = "id, evento_id, evento_servicio_id, catering_contrato_id, concepto, created_at, fecha_pago, forma_pago, moneda, banco, numero_cheque, importe_moneda_original, tipo_cambio, importe_en_pesos, es_garantia, deleted_at, notas";
 const cateringColumns = "*, usuarios!catering_contratos_ejecutiva_id_fkey(full_name,email), salones(nombre)";
 
 // Rebuild each page query: PostgREST's response limit must never truncate an export.
@@ -52,7 +52,7 @@ export async function loadCommercialExport(client: Client, kind: "evento" | "cat
 
   if (kind === "evento") {
     const event = (await eventById(id, true))!;
-    const services = await allRows((start, end) => client.from("evento_servicios").select("*,servicios_catalogo(nombre,categoria)").eq("evento_id", id).order("created_at").order("id").range(start, end)) as ExportService[];
+    const services = await allRows((start, end) => client.from("v_evento_servicios_acreditados").select("*,servicios_catalogo(nombre,categoria)").eq("evento_id", id).order("created_at").order("id").range(start, end)) as ExportService[];
     const serviceIds = new Set(services.map((s) => s.id));
     const [payments, currentContacts] = await Promise.all([
       allRows((start, end) => client.from("pagos").select(paymentColumns).eq("evento_id", id)
@@ -69,7 +69,7 @@ export async function loadCommercialExport(client: Client, kind: "evento" | "cat
     const caterings = [];
     // RLS also grants some catering reads through events; require its own screen permission here.
     if (allowed("catering")) {
-      const contracts = await allRows((start, end) => client.from("catering_contratos").select(cateringColumns)
+      const contracts = await allRows((start, end) => client.from("v_catering_acreditado").select(cateringColumns)
         .eq("evento_id", id).is("deleted_at", null).order("created_at").order("id").range(start, end)) as ExportCatering[];
       for (const catering of contracts) caterings.push({ catering, payments: await cateringPayments(catering) });
     }
@@ -78,7 +78,7 @@ export async function loadCommercialExport(client: Client, kind: "evento" | "cat
       caterings, cateringAllowed: allowed("catering") };
   }
 
-  const { data: row, error } = await client.from("catering_contratos").select(cateringColumns).eq("id", id).is("deleted_at", null).maybeSingle();
+  const { data: row, error } = await client.from("v_catering_acreditado").select(cateringColumns).eq("id", id).is("deleted_at", null).maybeSingle();
   if (error) throw new ExportError(500, "No se pudo leer el detalle del catering.");
   if (!row) throw new ExportError(404, "El registro no está disponible o no tenés acceso.");
   const catering = row as ExportCatering;

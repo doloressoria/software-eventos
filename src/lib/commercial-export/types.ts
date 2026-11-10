@@ -2,7 +2,7 @@ import type { Tables } from "../../types/database.types";
 
 export type ExportPayment = Pick<Tables<"pagos">,
   | "id" | "evento_id" | "evento_servicio_id" | "catering_contrato_id"
-  | "concepto" | "fecha_pago" | "forma_pago" | "moneda" | "banco"
+  | "concepto" | "created_at" | "fecha_pago" | "forma_pago" | "moneda" | "banco"
   | "numero_cheque" | "importe_moneda_original" | "tipo_cambio"
   | "importe_en_pesos" | "es_garantia" | "deleted_at" | "notas"
 >;

@@ -162,14 +162,14 @@ export async function getEventoFlujoDinero(
       .order("fecha_egreso", { ascending: false })
       .order("created_at", { ascending: false }),
     supabase
-      .from("evento_servicios")
+      .from("v_evento_servicios_acreditados")
       .select(
         "id, proveedor, total_con_iva, total_pagado, saldo_pendiente, servicios_catalogo(nombre, categoria)",
       )
       .eq("evento_id", evento.id)
       .order("created_at", { ascending: true }),
     supabase
-      .from("catering_contratos")
+      .from("v_catering_acreditado")
       .select(
         "id, tipo_servicio, total_con_iva, total_pagado, saldo_pendiente, comision_organizador_monto",
       )
@@ -229,12 +229,10 @@ export async function getEventoFlujoDinero(
     totalEvento === null ? null : Math.max(roundMoney(totalEvento - totalIngresos), 0);
   const serviciosResumen = getServiciosResumen(
     servicios,
-    pagosOrdinarios,
     egresos,
   );
   const cateringResumen = getCateringResumen(
     cateringContratos,
-    pagosOrdinarios,
     egresos,
   );
 
@@ -270,13 +268,10 @@ export async function getEventoFlujoDinero(
 
 function getServiciosResumen(
   servicios: FlujoEventoServicio[],
-  pagos: FlujoPago[],
   egresos: FlujoEgreso[],
 ): FlujoServicioResumen[] {
   return servicios.map((servicio) => {
-    const pagado = sumMoneyRows(
-      pagos.filter((pago) => pago.evento_servicio_id === servicio.id),
-    );
+    const pagado = toMoneyNumber(servicio.total_pagado);
     const egresado = sumMoneyRows(
       egresos.filter((egreso) => egreso.evento_servicio_id === servicio.id),
     );
@@ -288,7 +283,7 @@ function getServiciosResumen(
       nombre: servicio.servicios_catalogo?.nombre ?? "Servicio sin nombre",
       pagado,
       proveedor: servicio.proveedor,
-      saldoPendiente: roundMoney(total - pagado),
+      saldoPendiente: toMoneyNumber(servicio.saldo_pendiente),
       total,
     };
   });
@@ -296,13 +291,10 @@ function getServiciosResumen(
 
 function getCateringResumen(
   contratos: FlujoCateringContrato[],
-  pagos: FlujoPago[],
   egresos: FlujoEgreso[],
 ): FlujoCateringResumen[] {
   return contratos.map((contrato, index) => {
-    const pagado = sumMoneyRows(
-      pagos.filter((pago) => pago.catering_contrato_id === contrato.id),
-    );
+    const pagado = toMoneyNumber(contrato.total_pagado);
     const egresado = sumMoneyRows(
       egresos.filter((egreso) => egreso.catering_contrato_id === contrato.id),
     );
@@ -316,7 +308,7 @@ function getCateringResumen(
         contrato.tipo_servicio?.trim() ||
         `Contrato de catering ${index + 1}`,
       pagado,
-      saldoPendiente: roundMoney(total - pagado),
+      saldoPendiente: toMoneyNumber(contrato.saldo_pendiente),
       total,
     };
   });

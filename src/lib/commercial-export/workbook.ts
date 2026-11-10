@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
 import path from "node:path";
 import { cateringAmounts, ordinaryPayments, PARTIAL_NOTICE, paymentAmount, SEPARATE_NOTICE, serviceAmounts, uniquePayments } from "./calculations";
-import { roundMoney, sumGuarantees, sumOrdinaryPayments, toMoneyNumber } from "../pagos/calculos";
+import { getArgentinaPaymentDay, isChequePending, roundMoney, sumGuarantees, sumOrdinaryPayments, toMoneyNumber } from "../pagos/calculos";
 import { ExportError, type CateringExportData, type CommercialExportData, type EventExportData, type ExportContact, type ExportPayment } from "./types";
 
 const MONEY = '#,##0.00;[Red]-#,##0.00';
@@ -92,10 +92,14 @@ function paymentLabel(payment: ExportPayment) {
   return `${labels[payment.forma_pago] ?? payment.forma_pago} ${payment.moneda}`;
 }
 
+function pendingCheques(payments: ExportPayment[]) {
+  return uniquePayments(payments).filter((p) => !p.es_garantia && isChequePending(p));
+}
+
 function paymentBlock(sheet: Sheet, source: Sheet, start: number, title: string, payments: ExportPayment[], debt?: number, columns = 7) {
   let r = start;
   band(sheet, source, r++, title, columns);
-  const headers = ["Medio y moneda", "Fecha", "Banco", "N° cheque", "Importe original", "Cotización ARS", "Equivalente ARS"];
+  const headers = ["Medio y moneda", "Pago / acreditación", "Banco", "N° cheque", "Importe original", "Cotización ARS", "Equivalente ARS"];
   row(sheet, source, r++, source.name === "DC" ? 36 : 42, headers, columns);
   for (const payment of uniquePayments(payments)) {
     row(sheet, source, r, source.name === "DC" ? 37 : 43,
@@ -105,7 +109,10 @@ function paymentBlock(sheet: Sheet, source: Sheet, start: number, title: string,
     sheet.getCell(r, 6).dataValidation = { type: "decimal", operator: "greaterThan", formulae: [0], allowBlank: true };
     sheet.getCell(r, 2).dataValidation = { type: "date", operator: "between", formulae: [new Date("1900-01-01"), new Date("9999-12-31")], allowBlank: true };
     r++;
-    if (payment.concepto || payment.notas) note(sheet, source, r++, [payment.concepto, payment.notas].filter(Boolean).join(" · "), columns);
+    const registro = payment.forma_pago === "cheque"
+      ? `${isChequePending(payment) ? "Pendiente" : "Acreditado"} · Registrado: ${getArgentinaPaymentDay(new Date(payment.created_at))}`
+      : null;
+    if (registro || payment.concepto || payment.notas) note(sheet, source, r++, [registro, payment.concepto, payment.notas].filter(Boolean).join(" · "), columns);
     if (payment.importe_en_pesos === null && payment.moneda !== "ARS") note(sheet, source, r++, "Este pago no tiene equivalente en pesos guardado. No se convirtió automáticamente.", columns);
   }
   if (!payments.length) note(sheet, source, r++, "Sin pagos registrados.", columns);
@@ -175,9 +182,9 @@ function eventWorkbook(book: ExcelJS.Workbook, template: ExcelJS.Workbook, data:
     row(sheet, source, r, 28, [service.servicios_catalogo?.nombre ?? "Servicio sin catálogo", service.total_sin_iva,
       service.iva_base_imponible, service.iva_porcentaje, roundMoney(numeric(service.total_con_iva) - numeric(service.total_sin_iva)), amounts.paid, amounts.balance]);
     sheet.getCell(r++, 4).numFmt = RATE;
-    if (numeric(service.total_pagado) !== amounts.paid) note(sheet, source, r++, `Los cobros del detalle de ${service.servicios_catalogo?.nombre ?? "este servicio"} suman ${money(amounts.paid)}. El cobrado acumulado guardado es ${money(numeric(service.total_pagado))}. Se exportan los cobros ordinarios del detalle.`);
+    if (numeric(service.total_pagado) !== amounts.paid) note(sheet, source, r++, `Los cobros del detalle de ${service.servicios_catalogo?.nombre ?? "este servicio"} suman ${money(amounts.paid)}. El cobrado acreditado es ${money(numeric(service.total_pagado))}. Se exportan los cobros ordinarios del detalle.`);
     if (roundMoney(numeric(service.saldo_pendiente)) !== amounts.balance) {
-      note(sheet, source, r++, `El saldo mostrado en el detalle de ${service.servicios_catalogo?.nombre ?? "este servicio"} es ${money(amounts.balance)}. El saldo guardado es ${money(numeric(service.saldo_pendiente))}. Se exporta el saldo del detalle.`);
+      note(sheet, source, r++, `El saldo mostrado en el detalle de ${service.servicios_catalogo?.nombre ?? "este servicio"} es ${money(amounts.balance)}. El saldo SQL es ${money(numeric(service.saldo_pendiente))}. Se exporta el saldo del detalle.`);
     }
   }
   r++;
@@ -190,6 +197,8 @@ function eventWorkbook(book: ExcelJS.Workbook, template: ExcelJS.Workbook, data:
   total(sheet, source, r++, "Saldo servicios — detalle (deuda menos cobros)", roundMoney(eventTotal - sumOrdinaryPayments(payments)));
   note(sheet, source, r++, "Un saldo negativo indica un importe a favor. Las garantías se muestran por separado y no reducen la deuda.");
   r = paymentBlock(sheet, source, r + 1, "GARANTÍAS — SERVICIOS", payments.filter((p) => p.es_garantia));
+  const pending = pendingCheques(payments);
+  if (pending.length) r = paymentBlock(sheet, source, r, "CHEQUES PENDIENTES — NO APLICADOS AL SALDO", pending);
   band(sheet, source, r++, "DATOS DE FACTURACIÓN");
   for (const [label, value] of [["Razón social", e.cliente_razon_social], ["CUIT / DNI", e.cliente_cuit_dni], ["Dirección de factura", e.cliente_direccion_factura], ["Dirección", e.cliente_direccion], ["Ciudad", e.cliente_ciudad]] as const) note(sheet, source, r++, `${label}: ${value ?? "Sin dato guardado"}`);
   note(sheet, source, r++, "El evento no guarda un monto final de factura ni una empresa emisora. No se completaron esos importes desde la referencia.");
@@ -212,12 +221,14 @@ function eventWorkbook(book: ExcelJS.Workbook, template: ExcelJS.Workbook, data:
     band(cateringSheet, source, cr++, catering.tipo_servicio ?? "Contrato de catering");
     total(cateringSheet, source, cr++, "Total del catering — detalle", numeric(catering.total_con_iva));
     total(cateringSheet, source, cr++, "Saldo pendiente — detalle", numeric(catering.saldo_pendiente));
-    total(cateringSheet, source, cr++, "Cobrado acumulado guardado", catering.total_pagado);
+    total(cateringSheet, source, cr++, "Cobrado acreditado", catering.total_pagado);
     total(cateringSheet, source, cr++, "Cobros ordinarios registrados", sumOrdinaryPayments(own));
     total(cateringSheet, source, cr++, "Garantías registradas", sumGuarantees(own));
-    if (numeric(catering.total_pagado) !== sumOrdinaryPayments(own)) note(cateringSheet, source, cr++, `El cobrado acumulado guardado es ${money(numeric(catering.total_pagado))} y los pagos ordinarios disponibles suman ${money(sumOrdinaryPayments(own))}. El saldo del detalle utiliza el acumulado guardado.`);
+    if (numeric(catering.total_pagado) !== sumOrdinaryPayments(own)) note(cateringSheet, source, cr++, `El cobrado acreditado es ${money(numeric(catering.total_pagado))} y los pagos ordinarios disponibles suman ${money(sumOrdinaryPayments(own))}. El saldo del detalle utiliza el importe acreditado.`);
     cr = paymentBlock(cateringSheet, source, cr + 1, "PAGOS ORDINARIOS DEL CONTRATO", ordinaryPayments(own));
     cr = paymentBlock(cateringSheet, source, cr, "GARANTÍAS DEL CONTRATO", own.filter((p) => p.es_garantia));
+    const pending = pendingCheques(own);
+    if (pending.length) cr = paymentBlock(cateringSheet, source, cr, "CHEQUES PENDIENTES — NO APLICADOS AL SALDO", pending);
   }
   finish(cateringSheet, cr);
 
@@ -277,17 +288,19 @@ function cateringWorkbook(book: ExcelJS.Workbook, template: ExcelJS.Workbook, da
   total(sheet, source, r++, "Total del catering — detalle", amounts.storedTotal, 8);
   book.definedNames.add(`'DC'!$H$${r}`, "SaldoCateringDetalle");
   total(sheet, source, r++, "Saldo pendiente — detalle", amounts.detailBalance, 8);
-  total(sheet, source, r++, "Cobrado acumulado guardado utilizado por el detalle", c.total_pagado, 8);
+  total(sheet, source, r++, "Cobrado acreditado utilizado por el detalle", c.total_pagado, 8);
   total(sheet, source, r++, "Cobros ordinarios registrados", amounts.paid, 8);
   total(sheet, source, r++, "Garantías registradas — no reducen el saldo", amounts.guarantees, 8);
   if (amounts.difference !== 0) note(sheet, source, r++, `El total del detalle es ${money(amounts.storedTotal)} y el desglose según los datos actuales suma ${money(amounts.calculatedTotal)}. Diferencia: ${money(amounts.difference)}. Se mantiene el total del detalle.`, 8);
-  if (amounts.storedPaid !== amounts.paid) note(sheet, source, r++, `El cobrado acumulado guardado es ${money(amounts.storedPaid)} y los pagos ordinarios disponibles suman ${money(amounts.paid)}. El saldo del detalle utiliza el acumulado guardado.`, 8);
+  if (amounts.storedPaid !== amounts.paid) note(sheet, source, r++, `El cobrado acreditado es ${money(amounts.storedPaid)} y los pagos ordinarios disponibles suman ${money(amounts.paid)}. El saldo del detalle utiliza el importe acreditado.`, 8);
   if (amounts.detailBalance !== amounts.incomeBalance) note(sheet, source, r++, `El saldo del detalle es ${money(amounts.detailBalance)}. En la pantalla de ingresos, el saldo pendiente es ${money(amounts.incomeBalance)}, calculado con los cobros ordinarios y con mínimo cero.`, 8);
   if (amounts.unitPrice === null) note(sheet, source, r++, "No hay un precio vigente por persona guardado. El total del detalle se conserva sin reconstruir precios.", 8);
   if (!data.eventAllowed) note(sheet, source, r++, `${PARTIAL_NOTICE} Los datos del evento vinculado no están incluidos.`, 8);
   note(sheet, source, r++, "Los saldos negativos del detalle indican un importe a favor. No se asignaron PAX ni precios a los pagos.", 8);
   r = paymentBlock(sheet, source, r + 1, "PAGOS ORDINARIOS", ordinaryPayments(data.payments), undefined, 8);
   r = paymentBlock(sheet, source, r, "GARANTÍAS", uniquePayments(data.payments).filter((p) => p.es_garantia), undefined, 8);
+  const pending = pendingCheques(data.payments);
+  if (pending.length) r = paymentBlock(sheet, source, r, "CHEQUES PENDIENTES — NO APLICADOS AL SALDO", pending, undefined, 8);
   band(sheet, source, r++, "COMISIÓN Y REVISIÓN DEL DESGLOSE ACTUAL", 8);
   for (const [label, value] of [["Comisión organizador", c.comision_organizador_monto], ["IVA de la comisión según tasa guardada", amounts.commissionVat],
     ["IVA del precio vigente y los ítems según tasa guardada", amounts.vat], ["Total según precios y adicionales actuales (incluye comisión e IVA)", amounts.calculatedTotal],

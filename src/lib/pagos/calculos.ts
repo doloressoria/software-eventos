@@ -11,14 +11,29 @@ export type MoneyRow = {
 
 export type PaymentMoneyRow = MoneyRow & {
   es_garantia: boolean;
+  fecha_pago: string;
+  forma_pago: string;
 };
+
+const argentinaDate = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Argentina/Buenos_Aires", year: "numeric", month: "2-digit", day: "2-digit",
+});
+
+export function getArgentinaPaymentDay(now = new Date()) {
+  const parts = Object.fromEntries(argentinaDate.formatToParts(now).map(({ type, value }) => [type, value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+export function isChequePending(payment: Pick<PaymentMoneyRow, "forma_pago" | "fecha_pago">, day?: string) {
+  return payment.forma_pago === "cheque" && payment.fecha_pago > (day ?? getArgentinaPaymentDay());
+}
 
 export function isActiveMoneyRow(row: MoneyRow) {
   return !row.deleted_at;
 }
 
 export function isOrdinaryPayment(payment: PaymentMoneyRow) {
-  return isActiveMoneyRow(payment) && !payment.es_garantia;
+  return isActiveMoneyRow(payment) && !payment.es_garantia && !isChequePending(payment);
 }
 
 export function getActiveOrdinaryPayments<T extends PaymentMoneyRow>(

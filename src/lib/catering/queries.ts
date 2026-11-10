@@ -93,7 +93,7 @@ export function getCateringDisplayFields(
 export async function listCaterings() {
   const supabase = await createClient();
   const { data, error } = await supabase
-    .from("catering_contratos")
+    .from("v_catering_acreditado")
     .select(
       "id, evento_id, cliente_nombre, cliente_razon_social, cliente_cuit_dni, cliente_contacto, fecha_evento, tipo_evento, salon_id, lugar_evento, tipo_servicio, total_con_iva, saldo_pendiente, eventos(cliente_nombre, cliente_razon_social, cliente_cuit_dni, fecha_evento, tipo_evento, salones(nombre)), salones(nombre)",
     )
@@ -228,7 +228,7 @@ export type EventoCateringItem = Pick<
 export async function getEventoCaterings(eventoId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
-    .from("catering_contratos")
+    .from("v_catering_acreditado")
     .select(
       "id, tipo_servicio, pax_adultos, pax_jovenes, pax_menores, pax_bebes, total_con_iva, total_pagado, saldo_pendiente",
     )
@@ -254,7 +254,7 @@ export async function getCateringById(id: string) {
   const supabase = await createClient();
   const [cateringResult, itemsResult, precioHistorialResult] = await Promise.all([
     supabase
-      .from("catering_contratos")
+      .from("v_catering_acreditado")
       .select(
         "*, eventos(cliente_nombre, cliente_razon_social, cliente_cuit_dni, fecha_evento, tipo_evento, salones(nombre)), salones(nombre), usuarios!catering_contratos_ejecutiva_id_fkey(full_name, email)",
       )

@@ -8,7 +8,6 @@ import * as calculos from "./calculos";
 
 function setup(catering: boolean, options: { denied?: boolean; failure?: boolean; external?: boolean } = {}) {
   const writes: { table: string; mode: string; values: Record<string, unknown>; filters: string[] }[] = [];
-  const recalculated: string[] = [];
   const invalidations: string[] = [];
   const db = { from(table: string) {
     let write: typeof writes[number] | undefined;
@@ -33,7 +32,6 @@ function setup(catering: boolean, options: { denied?: boolean; failure?: boolean
     "@/lib/auth": { getCurrentProfile: async () => ({ id: "actor", activo: true }), getAuthorizedActiveEvento: async () => options.denied ? null : { id: "event" } },
     "@/lib/pagos/validation": validation,
     "@/lib/pagos/calculos": calculos,
-    "@/lib/evento-servicios/recalculate-totals": { recalculateEventoServicioTotals: async (id: string) => recalculated.push(id) },
     "@/lib/roles/access": { requireScreenManagement: async () => {} },
     "@/lib/supabase/server": { createClient: async () => db },
     "@/lib/supabase/errors": { logSupabaseError() {} },
@@ -42,7 +40,7 @@ function setup(catering: boolean, options: { denied?: boolean; failure?: boolean
   const exports: Record<string, (...args: unknown[]) => Promise<validation.PagoFormState>> = {};
   const source = ts.transpileModule(readFileSync(`src/app/(protected)/${catering ? "catering" : "pagos"}/actions.ts`, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   runInNewContext(source, { exports, Date, require: (name: string) => { assert.ok(name in dependencies, name); return dependencies[name]; } });
-  return { exports, writes, recalculated, invalidations };
+  return { exports, writes, invalidations };
 }
 
 function form() {
@@ -74,9 +72,7 @@ for (const mode of ["evento", "catering asociado", "catering externo"]) {
         assert.equal("registrado_por" in write.values, false);
       }
       if (mode === "catering externo") assert.equal(write.values.evento_id, null);
-      if (catering) assert.equal(s.recalculated.length, 0);
-      else assert.ok(s.recalculated.includes("service"));
-      if (!catering && editing) assert.ok(s.recalculated.includes("old-service"));
+      assert.deepEqual(s.writes.map(w => w.table), ["pagos"]);
     }
   });
   test(`${mode}: acceso denegado no escribe; error SQL conserva el borrador`, async () => {
@@ -86,7 +82,6 @@ for (const mode of ["evento", "catering asociado", "catering externo"]) {
       const result = await s.exports[action](catering ? "contract" : "event", "payment", validation.getEmptyPagoFormState(), form());
       assert.ok(result.formError);
       assert.equal(result.fields.tipo_cambio, "1200.1234");
-      assert.equal(s.recalculated.length, 0);
       assert.equal(s.invalidations.length, 0);
       if (denied) assert.equal(s.writes.length, 0);
     }
@@ -97,7 +92,6 @@ for (const mode of ["evento", "catering asociado", "catering externo"]) {
     const write = s.writes.find(w => w.table === "pagos")!;
     assert.ok(write.values.deleted_at);
     assert.equal(Object.keys(write.values).length, 1);
-    if (catering) assert.equal(s.recalculated.length, 0);
-    else assert.ok(s.recalculated.includes("old-service"));
+    assert.deepEqual(s.writes.map(w => w.table), ["pagos"]);
   });
 }

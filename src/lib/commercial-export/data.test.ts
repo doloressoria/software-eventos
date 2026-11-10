@@ -15,8 +15,8 @@ function database({ screens = ["eventos", "catering"], active = true, authentica
   const selections: string[] = [];
   const rows: Record<string, object[]> = {
     usuarios: [{ id: fixtureId(99), rol: "vendedor", activo: active }], eventos: [event.event],
-    evento_servicios: event.services, pagos: [...event.payments, ...catering.payments.map((p) => ({ ...p, id: `contract-${p.id}` }))],
-    catering_contratos: [catering.catering], catering_items: catering.items, catering_precio_historial: catering.history,
+    v_evento_servicios_acreditados: event.services, pagos: [...event.payments, ...catering.payments.map((p) => ({ ...p, id: `contract-${p.id}` }))],
+    v_catering_acreditado: [catering.catering], catering_items: catering.items, catering_precio_historial: catering.history,
     evento_contactos: event.contacts.map((c) => ({ ...c, evento_id: event.event.id, deleted_at: null })), actualizaciones_ipc: event.updates,
   };
   const client = {
@@ -42,7 +42,7 @@ function database({ screens = ["eventos", "catering"], active = true, authentica
   return { client, reads, selections, event, catering };
 }
 
-test("exportar evento sin permiso catering no consulta contratos ni sus pagos ni vistas", async () => {
+test("exportar evento sin permiso catering no consulta contratos ni el resumen general", async () => {
   const db = database({ screens: ["eventos"] });
   const data = await loadCommercialExport(db.client, "evento", db.event.event.id);
   assert.equal(data.kind, "evento");
@@ -50,8 +50,8 @@ test("exportar evento sin permiso catering no consulta contratos ni sus pagos ni
   assert.equal(data.cateringAllowed, false);
   assert.deepEqual(data.caterings, []);
   assert.ok(data.payments.every((p) => !p.catering_contrato_id));
-  assert.ok(!db.reads.includes("catering_contratos"));
-  assert.ok(!db.reads.some((r) => r.startsWith("v_")));
+  assert.ok(!db.reads.includes("v_catering_acreditado"));
+  assert.ok(!db.reads.includes("v_resumen_evento"));
 });
 
 test("catering sin permiso evento no lee fila, contactos ni joins del evento", async () => {
@@ -68,18 +68,18 @@ test("catering sin permiso evento no lee fila, contactos ni joins del evento", a
 });
 
 test("contratos filtrados por RLS no se recuperan mediante resúmenes", async () => {
-  const db = database({ denied: "catering_contratos" });
+  const db = database({ denied: "v_catering_acreditado" });
   const data = await loadCommercialExport(db.client, "evento", db.event.event.id);
   assert.equal(data.kind, "evento");
   if (data.kind === "evento") assert.deepEqual(data.caterings, []);
-  assert.ok(!db.reads.some((r) => r.startsWith("v_")));
+  assert.ok(!db.reads.includes("v_resumen_evento"));
 });
 
 test("sin sesión, usuario inactivo, pantalla denegada o registro inaccesible no se exporta", async () => {
   for (const [options, kind, id, status] of [
     [{ authenticated: false }, "evento", fixtureId(1), 401], [{ active: false }, "evento", fixtureId(1), 403],
     [{ screens: ["catering"] }, "evento", fixtureId(1), 403], [{ screens: ["eventos"] }, "catering", fixtureId(30), 403],
-    [{ denied: "eventos" }, "evento", fixtureId(1), 404], [{ denied: "catering_contratos" }, "catering", fixtureId(30), 404],
+    [{ denied: "eventos" }, "evento", fixtureId(1), 404], [{ denied: "v_catering_acreditado" }, "catering", fixtureId(30), 404],
   ] as const) {
     const db = database(options);
     await assert.rejects(loadCommercialExport(db.client, kind, id), (error: unknown) => error instanceof ExportError && error.status === status);

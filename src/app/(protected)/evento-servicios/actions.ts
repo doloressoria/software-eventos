@@ -8,7 +8,6 @@ import {
   type EventoServicioFormState,
   validateEventoServicioForm,
 } from "@/lib/evento-servicios/validation";
-import { getTotalPagadoEventoServicio } from "@/lib/evento-servicios/recalculate-totals";
 import { IVA_PORCENTAJE } from "@/lib/pagos/calculos";
 import { createClient } from "@/lib/supabase/server";
 import { logSupabaseError } from "@/lib/supabase/errors";
@@ -120,7 +119,6 @@ export async function updateEventoServicioAction(
   }
 
   const supabase = await createClient();
-  const totalPagado = await getTotalPagadoEventoServicio(eventoServicioId);
   const { data, error } = await supabase
     .from("evento_servicios")
     .update({
@@ -133,7 +131,6 @@ export async function updateEventoServicioAction(
       precio_base: payload.precio_base,
       proveedor: payload.proveedor,
       servicio_id: payload.servicio_id,
-      total_pagado: totalPagado,
       updated_at: new Date().toISOString(),
     })
     .eq("id", eventoServicioId)

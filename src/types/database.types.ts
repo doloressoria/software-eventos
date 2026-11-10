@@ -1304,6 +1304,125 @@ export type Database = {
         }
         Relationships: []
       }
+      v_catering_acreditado: {
+        Row: {
+          cliente_contacto: string | null
+          cliente_cuit_dni: string | null
+          cliente_nombre: string | null
+          cliente_razon_social: string | null
+          comision_organizador_monto: number | null
+          created_at: string | null
+          deleted_at: string | null
+          ejecutiva_id: string | null
+          emite_factura: boolean | null
+          evento_id: string | null
+          factura_concepto: string | null
+          factura_contacto_admin: string | null
+          factura_cuit: string | null
+          factura_direccion: string | null
+          factura_razon_social: string | null
+          fecha_evento: string | null
+          id: string | null
+          iva_comision: number | null
+          iva_porcentaje: number | null
+          lugar_evento: string | null
+          monto_con_factura: number | null
+          monto_sin_factura: number | null
+          notas: string | null
+          pax_adultos: number | null
+          pax_bebes: number | null
+          pax_comida: number | null
+          pax_final: number | null
+          pax_jovenes: number | null
+          pax_menores: number | null
+          pax_post_postre: number | null
+          precio_cierre_alimentos_sin_iva: number | null
+          precio_cierre_bebidas_sin_iva: number | null
+          saldo_pendiente: number | null
+          salon_id: string | null
+          tipo_evento: string | null
+          tipo_servicio: string | null
+          total_con_iva: number | null
+          total_pagado: number | null
+          total_sin_iva: number | null
+          updated_at: string | null
+        }
+        ComputedFields: never
+        Relationships: [
+          {
+            foreignKeyName: "catering_contratos_ejecutiva_id_fkey"
+            columns: ["ejecutiva_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catering_contratos_evento_id_fkey"
+            columns: ["evento_id"]
+            isOneToOne: false
+            referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catering_contratos_evento_id_fkey"
+            columns: ["evento_id"]
+            isOneToOne: false
+            referencedRelation: "v_resumen_evento"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catering_contratos_salon_id_fkey"
+            columns: ["salon_id"]
+            isOneToOne: false
+            referencedRelation: "salones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_evento_servicios_acreditados: {
+        Row: {
+          adicionales_monto: number | null
+          comisiona_organizador: boolean | null
+          created_at: string | null
+          evento_id: string | null
+          id: string | null
+          iva_base_imponible: number | null
+          iva_porcentaje: number | null
+          notas: string | null
+          precio_base: number | null
+          proveedor: string | null
+          saldo_pendiente: number | null
+          servicio_id: string | null
+          total_con_iva: number | null
+          total_pagado: number | null
+          total_sin_iva: number | null
+          updated_at: string | null
+        }
+        ComputedFields: never
+        Relationships: [
+          {
+            foreignKeyName: "evento_servicios_evento_id_fkey"
+            columns: ["evento_id"]
+            isOneToOne: false
+            referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evento_servicios_evento_id_fkey"
+            columns: ["evento_id"]
+            isOneToOne: false
+            referencedRelation: "v_resumen_evento"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evento_servicios_servicio_id_fkey"
+            columns: ["servicio_id"]
+            isOneToOne: false
+            referencedRelation: "servicios_catalogo"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_resumen_evento: {
         Row: {
           cliente_nombre: string | null

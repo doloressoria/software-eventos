@@ -13,6 +13,7 @@ const usd = process.argv.includes("--usd");
 const contactos = process.argv.includes("--contactos");
 const balances = process.argv.includes("--balances");
 const catering = process.argv.includes("--catering");
+const cheques = process.argv.includes("--cheques");
 const expenses = process.argv.includes("--expenses");
 try {
   execFileSync(pg("initdb"), ["-D", join(dir, "data"), "-U", "postgres",
@@ -24,7 +25,20 @@ try {
     "begin;",
     readFileSync("supabase/tests/fixtures/payments-schema.sql", "utf8"),
     readFileSync("supabase/tests/payments-setup.sql", "utf8"),
-    ...(catering ? [
+    ...(cheques ? [
+      "create role service_role nologin;",
+      ...[
+        "20261021145259_unblock_payments_and_summary_access",
+        "20261021152307_evento_contactos",
+        "20261021155412_payments_manual_usd",
+        "20261106190930_align_service_balance_with_partial_vat",
+        "20261106191328_atomic_catering_totals",
+      ].map((name) => readFileSync(`supabase/migrations/${name}.sql`, "utf8")),
+      readFileSync("supabase/tests/cheques-before.sql", "utf8"),
+      readFileSync("supabase/migrations/20261110160147_acreditacion_cheques.sql", "utf8"),
+      readFileSync("supabase/tests/cheques.sql", "utf8"),
+      "rollback;",
+    ] : catering ? [
       readFileSync("supabase/migrations/20261021145259_unblock_payments_and_summary_access.sql", "utf8"),
       readFileSync("supabase/migrations/20261021152307_evento_contactos.sql", "utf8"),
       readFileSync("supabase/migrations/20261021155412_payments_manual_usd.sql", "utf8"),

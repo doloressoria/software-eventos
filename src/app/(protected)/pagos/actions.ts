@@ -3,8 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getAuthorizedActiveEvento, getCurrentProfile } from "@/lib/auth";
-import { recalculateEventoServicioTotals } from "@/lib/evento-servicios/recalculate-totals";
-import { getMoneyAmount, isOrdinaryPayment } from "@/lib/pagos/calculos";
 import {
   getEmptyPagoFormState,
   type PagoFormState,
@@ -71,10 +69,6 @@ async function savePago(eventoId: string, pagoId: string | null, formData: FormD
   }
 
   const supabase = await createClient();
-  const previous = pagoId ? await supabase.from("pagos").select("evento_servicio_id")
-    .eq("id", pagoId).eq("evento_id", evento.id).is("catering_contrato_id", null)
-    .is("deleted_at", null).maybeSingle() : null;
-  if (pagoId && (!previous?.data || previous.error)) return { ...state, formError: CREATE_PAGO_ERROR };
   const values = {
     concepto: payload.concepto,
     es_garantia: payload.es_garantia,
@@ -108,15 +102,6 @@ async function savePago(eventoId: string, pagoId: string | null, formData: FormD
       ...state,
       formError: CREATE_PAGO_ERROR,
     };
-  }
-
-  if (!pagoId) await setEventoFechaContratoIfMissing(evento.id, payload.fecha_pago);
-  if (previous?.data?.evento_servicio_id && previous.data.evento_servicio_id !== eventoServicioId) {
-    await recalculateEventoServicioTotals(previous.data.evento_servicio_id);
-  }
-
-  if (eventoServicioId) {
-    await recalculateEventoServicioTotals(eventoServicioId);
   }
 
   revalidateEventoPaths(evento.id);
@@ -160,7 +145,7 @@ export async function deletePagoAction(
     .eq("id", pagoId)
     .eq("evento_id", evento.id)
     .is("deleted_at", null)
-    .select("id, evento_servicio_id")
+    .select("id")
     .maybeSingle();
 
   if (error) {
@@ -174,10 +159,6 @@ export async function deletePagoAction(
     return {
       formError: DELETE_PAGO_ERROR,
     };
-  }
-
-  if (data.evento_servicio_id) {
-    await recalculateEventoServicioTotals(data.evento_servicio_id);
   }
 
   revalidateEventoPaths(evento.id);
@@ -207,87 +188,21 @@ async function isEventoServicioForEvento(
 
 async function getEventoServicioConMayorSaldo(eventoId: string) {
   const supabase = await createClient();
-  const [serviciosResult, pagosResult] = await Promise.all([
-    supabase
-      .from("evento_servicios")
-      .select("id, total_con_iva")
-      .eq("evento_id", eventoId),
-    supabase
-      .from("pagos")
-      .select(
-        "es_garantia, evento_servicio_id, importe_en_pesos, importe_moneda_original, moneda",
-      )
-      .eq("evento_id", eventoId)
-      .is("deleted_at", null)
-      .not("evento_servicio_id", "is", null),
-  ]);
-
-  if (serviciosResult.error) {
-    logSupabaseError(
-      "pagos obtener servicios para asignacion automatica",
-      serviciosResult.error,
-    );
-    return null;
-  }
-
-  if (pagosResult.error) {
-    logSupabaseError(
-      "pagos obtener pagos para asignacion automatica",
-      pagosResult.error,
-    );
-    return null;
-  }
-
-  const pagosPorServicio = new Map<string, number>();
-
-  for (const pago of pagosResult.data) {
-    if (!pago.evento_servicio_id || !isOrdinaryPayment(pago)) {
-      continue;
-    }
-
-    const monto = getMoneyAmount(pago);
-    const current = pagosPorServicio.get(pago.evento_servicio_id) ?? 0;
-
-    pagosPorServicio.set(pago.evento_servicio_id, current + monto);
-  }
-
-  let selectedServicioId: string | null = null;
-  let selectedSaldo = 0;
-
-  for (const servicio of serviciosResult.data) {
-    const totalServicio = toMoneyNumber(servicio.total_con_iva);
-    const totalPagado = pagosPorServicio.get(servicio.id) ?? 0;
-    const saldo = totalServicio - totalPagado;
-
-    if (saldo > selectedSaldo) {
-      selectedServicioId = servicio.id;
-      selectedSaldo = saldo;
-    }
-  }
-
-  return selectedServicioId;
-}
-
-async function setEventoFechaContratoIfMissing(
-  eventoId: string,
-  fechaPago: string,
-) {
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("eventos")
-    .update({
-      fecha_contrato: fechaPago,
-    })
-    .eq("id", eventoId)
-    .is("fecha_contrato", null);
+  const { data, error } = await supabase
+    .from("v_evento_servicios_acreditados")
+    .select("id")
+    .eq("evento_id", eventoId)
+    .gt("saldo_pendiente", 0)
+    .order("saldo_pendiente", { ascending: false })
+    .order("id")
+    .limit(1)
+    .maybeSingle();
 
   if (error) {
-    logSupabaseError("pagos actualizar fecha de primer ingreso", error);
+    logSupabaseError("pagos obtener servicios para asignacion automatica", error);
   }
-}
 
-function toMoneyNumber(value: number | null | undefined) {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+  return data?.id ?? null;
 }
 
 function revalidateEventoPaths(eventoId: string) {

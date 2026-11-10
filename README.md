@@ -295,3 +295,9 @@ antes de publicar la UI. Los tipos de `public` se regeneraron contra la base fin
 con la herramienta oficial MCP, comprobando que el resultado fuera completo.
 Conservar las anotaciones de columnas generadas como `never` y el argumento nullable
 de creación de roles al regenerarlos: esas restricciones no las expresa el generador.
+
+### Acreditación automática de cheques
+
+El [runbook de cheques](docs/acreditacion-cheques.md) explica la fecha local,
+la diferencia con la fecha de contrato, las pruebas aisladas y el orden de
+aplicación en Supabase SQL Editor.

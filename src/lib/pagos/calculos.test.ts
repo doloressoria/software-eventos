@@ -5,6 +5,8 @@ import {
   calculateServicioPaymentTotals,
   calculateMoneyFlow,
   calculatePaymentSummary,
+  getArgentinaPaymentDay,
+  isChequePending,
   IVA_PORCENTAJE,
   sumGuarantees,
   sumOrdinaryPayments,
@@ -21,6 +23,7 @@ function payment(
   return {
     es_garantia: false,
     forma_pago,
+    fecha_pago: "2026-01-01",
     importe_en_pesos: amount,
     ...extra,
   };
@@ -143,14 +146,8 @@ test("redondea neto e IVA por pago antes de acumular", () => {
   assert.equal(totals.netoNoEfectivo + totals.ivaPagadoNoEfectivo, totals.totalPagado);
 });
 
-const ordinaryPayment: PaymentMoneyRow = {
-  es_garantia: false,
-  importe_en_pesos: 400,
-};
-const guarantee: PaymentMoneyRow = {
-  es_garantia: true,
-  importe_en_pesos: 250,
-};
+const ordinaryPayment = payment(400);
+const guarantee = payment(250, "transferencia", { es_garantia: true });
 
 test("evento sin pagos conserva toda la deuda", () => {
   assert.deepEqual(calculatePaymentSummary({ payments: [], total: 1_000 }), {
@@ -256,13 +253,13 @@ test("detalle financiero, flujo y reporte usan el mismo ingreso ordinario", () =
     ],
     pagos: [
       {
-        es_garantia: ordinaryPayment.es_garantia,
+        ...ordinaryPayment,
         evento_id: "evento-1",
         fecha_pago: "2026-08-01",
         importe_en_pesos: ordinaryPayment.importe_en_pesos,
       },
       {
-        es_garantia: guarantee.es_garantia,
+        ...guarantee,
         evento_id: "evento-1",
         fecha_pago: "2026-08-02",
         importe_en_pesos: guarantee.importe_en_pesos,
@@ -288,4 +285,25 @@ test("detalle financiero, flujo y reporte usan el mismo ingreso ordinario", () =
   assert.equal(report.metricas.garantias_registradas, 250);
   assert.equal(report.metricas.pendiente_cobro, detail.saldoPendiente);
   assert.equal(report.porEvento[0].pendiente_cobro, detail.saldoPendiente);
+});
+
+test("el cheque pasa de pendiente a acreditado a medianoche de Argentina", (t) => {
+  const cheque = payment(605, "cheque", { fecha_pago: "2026-11-11" });
+  const usd = payment(120, "efectivo_dolares", { moneda: "USD", importe_moneda_original: 1 });
+  const garantia = { ...cheque, es_garantia: true };
+  const payments = [cheque, usd, garantia];
+  const before = new Date("2026-11-11T02:59:59Z");
+  t.mock.timers.enable({ apis: ["Date"], now: before.getTime() });
+
+  assert.equal(getArgentinaPaymentDay(), "2026-11-10");
+  assert.equal(isChequePending(cheque), true);
+  assert.equal(calculatePaymentSummary({ payments, total: 1_105 }).saldoPendiente, 985);
+  assert.equal(calculateServicioPaymentTotals(payments, 500, 1_000).ivaBaseImponible, 500);
+
+  for (const instant of ["2026-11-11T03:00:00Z", "2026-11-12T03:00:00Z"]) {
+    t.mock.timers.setTime(Date.parse(instant));
+    assert.equal(isChequePending(cheque), false);
+    assert.equal(calculateMoneyFlow({ payments, expenses: [] }).totalIngresos, 725);
+    assert.equal(calculatePaymentSummary({ payments, total: 1_105 }).saldoPendiente, 380);
+  }
 });

@@ -1,3 +1,4 @@
+import { PagoFechas } from "@/components/pagos/pago-fechas";
 import { PagoImporte } from "@/components/pagos/pago-importe";
 import Link from "next/link";
 import { EventoDetalleNav } from "@/components/eventos/evento-detalle-nav";
@@ -154,7 +155,8 @@ export default async function EventoFlujoDineroPage({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Fecha</TableHead>
+                  <TableHead>Fecha de registro</TableHead>
+                  <TableHead>Pago / acreditación</TableHead>
                   <TableHead>Concepto</TableHead>
                   <TableHead>Forma</TableHead>
                   <TableHead>Moneda</TableHead>
@@ -165,7 +167,7 @@ export default async function EventoFlujoDineroPage({
               <TableBody>
                 {flujo.pagos.map((pago) => (
                   <TableRow key={pago.id}>
-                    <TableCell>{formatDate(pago.fecha_pago)}</TableCell>
+                    <PagoFechas pago={pago} />
                     <TableCell className="font-medium text-slate-950">
                       <div className="flex flex-wrap items-center gap-2">
                         <span>{pago.concepto ?? "-"}</span>

@@ -6,7 +6,7 @@ export function examplePayment(n: number, serviceId: string | null = fixtureId(2
   const usd = n % 2 === 0;
   const transfer = n % 3 === 0;
   return { id: fixtureId(100 + n), evento_id: fixtureId(1), evento_servicio_id: serviceId, catering_contrato_id: contractId,
-    concepto: "Anticipo ficticio", fecha_pago: "2026-10-20", forma_pago: transfer ? "transferencia" : usd ? "efectivo_dolares" : "efectivo_pesos",
+    concepto: "Anticipo ficticio", created_at: "2026-10-19T12:00:00Z", fecha_pago: "2026-10-20", forma_pago: transfer ? "transferencia" : usd ? "efectivo_dolares" : "efectivo_pesos",
     moneda: usd ? "USD" : "ARS", banco: transfer ? "Banco ficticio" : null, numero_cheque: null, importe_moneda_original: usd ? 2 : 125,
     tipo_cambio: usd ? 1000 + n : 1, importe_en_pesos: usd ? 2 * (1000 + n) : 125, es_garantia: n % 7 === 0, deleted_at: null, notas: null };
 }

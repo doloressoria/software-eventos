@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { DatePickerField } from "@/components/ui/date-picker-field";
 import { FieldError, Input, Label } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { pagoFormaPagoOptions, paymentEquivalent, type PagoFormState } from "@/lib/pagos/validation";
@@ -35,6 +36,21 @@ export function PagoMoneyFields({ state }: { state: PagoFormState }) {
         <SelectContent>{pagoFormaPagoOptions.filter(option => moneda === "USD" ? ["transferencia", "efectivo_dolares"].includes(option) : option !== "efectivo_dolares").map(option => <SelectItem key={option} value={option}>{labels[option]}</SelectItem>)}</SelectContent>
       </Select>
       {state.errors.forma_pago && <FieldError id={`${id}-forma-error`}>{state.errors.forma_pago}</FieldError>}
+    </div>
+    <div>
+      <Label htmlFor={`${id}-fecha-pago`}>{forma === "cheque" ? "Fecha de acreditación" : "Fecha de pago"}</Label>
+      <DatePickerField
+        id={`${id}-fecha-pago`}
+        name="fecha_pago"
+        required
+        defaultValue={state.fields.fecha_pago}
+        aria-invalid={Boolean(state.errors.fecha_pago)}
+        aria-describedby={`${id}-fecha-pago-ayuda`}
+      />
+      <div id={`${id}-fecha-pago-ayuda`}>
+        {state.errors.fecha_pago && <FieldError id={`${id}-fecha-pago-error`}>{state.errors.fecha_pago}</FieldError>}
+        {forma === "cheque" && <p className="mt-1 text-xs text-slate-500">El cheque queda pendiente hasta ese día en Argentina.</p>}
+      </div>
     </div>
     <div>
       <Label htmlFor={`${id}-monto`}>Importe original ({moneda})</Label>

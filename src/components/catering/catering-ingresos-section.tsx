@@ -1,3 +1,4 @@
+import { PagoFechas } from "@/components/pagos/pago-fechas";
 import { PagoImporte } from "@/components/pagos/pago-importe";
 import {
   createCateringPagoAction,
@@ -41,7 +42,7 @@ export function CateringIngresosSection({
         <div>
           <CardTitle>Ingresos</CardTitle>
           <CardDescription>
-            Pagos y garantias registrados; solo los pagos ordinarios reducen el saldo.
+            Pagos y garantias registrados; solo los pagos ordinarios acreditados reducen el saldo.
           </CardDescription>
         </div>
         <Badge variant={getEstadoCobroVariant(ingresos.estadoCobro)}>
@@ -66,7 +67,8 @@ export function CateringIngresosSection({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Fecha</TableHead>
+                  <TableHead>Fecha de registro</TableHead>
+                  <TableHead>Pago / acreditación</TableHead>
                   <TableHead>Concepto</TableHead>
                   <TableHead>Forma</TableHead>
                   <TableHead className="text-right">Importe y equivalente ARS</TableHead>
@@ -77,7 +79,7 @@ export function CateringIngresosSection({
               <TableBody>
                 {ingresos.pagos.map((pago) => (
                   <TableRow key={pago.id}>
-                    <TableCell>{formatDate(pago.fecha_pago)}</TableCell>
+                    <PagoFechas pago={pago} />
                     <TableCell className="font-medium text-slate-950">
                       <div className="flex flex-wrap items-center gap-2">
                         <span>{pago.concepto ?? "-"}</span>
@@ -137,15 +139,6 @@ function SummaryItem({ label, value }: { label: string; value: string }) {
       <dd className="mt-1 text-lg font-semibold text-slate-950">{value}</dd>
     </div>
   );
-}
-
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    timeZone: "UTC",
-    year: "numeric",
-  }).format(new Date(`${value}T00:00:00.000Z`));
 }
 
 function formatCurrency(value: number) {

@@ -1,6 +1,7 @@
 import {
   roundMoney,
   sumGuarantees,
+  isOrdinaryPayment,
   sumOrdinaryPayments,
 } from "../pagos/calculos";
 
@@ -96,6 +97,7 @@ export type ReporteFinancieroPago = {
   es_garantia: boolean;
   evento_id: string;
   fecha_pago: string;
+  forma_pago: string;
   importe_en_pesos: number | null;
 };
 
@@ -130,7 +132,7 @@ export function buildReportesFinancieros({
   const resultado_neto = roundMoney(ingresos_cobrados - egresos_pagados);
   const eventos_incluidos = eventos.length;
   const ingresosByEvento = groupImportesByEvento(
-    pagos.filter((pago) => !pago.es_garantia),
+    pagos.filter(isOrdinaryPayment),
   );
   const total_vendido = roundMoney(
     eventos.reduce(
@@ -204,7 +206,7 @@ function getFinancierosPorEvento({
   resumenByEvento: Map<string, ReporteFinancieroResumen>;
 }): ReportesFinancierosEventoRow[] {
   const ingresosByEvento = groupImportesByEvento(
-    pagos.filter((pago) => !pago.es_garantia),
+    pagos.filter(isOrdinaryPayment),
   );
   const egresosByEvento = groupImportesByEvento(egresos);
 
@@ -250,7 +252,7 @@ function getFinancierosPorSalon({
   resumenByEvento: Map<string, ReporteFinancieroResumen>;
 }): ReportesFinancierosSalonRow[] {
   const ingresosByEvento = groupImportesByEvento(
-    pagos.filter((pago) => !pago.es_garantia),
+    pagos.filter(isOrdinaryPayment),
   );
   const egresosByEvento = groupImportesByEvento(egresos);
   const groups = new Map<string, ReportesFinancierosSalonRow>();
@@ -311,7 +313,7 @@ function getFinancierosPorVendedor({
   pagos: ReporteFinancieroPago[];
 }): ReportesFinancierosVendedorRow[] {
   const ingresosByEvento = groupImportesByEvento(
-    pagos.filter((pago) => !pago.es_garantia),
+    pagos.filter(isOrdinaryPayment),
   );
   const egresosByEvento = groupImportesByEvento(egresos);
   const groups = new Map<string, ReportesFinancierosVendedorRow>();
@@ -362,7 +364,7 @@ function getEvolucionMensual(
   const months = new Map<string, ReportesFinancierosMesRow>();
 
   for (const pago of pagos) {
-    if (pago.es_garantia) {
+    if (!isOrdinaryPayment(pago)) {
       continue;
     }
 

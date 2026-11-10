@@ -2,9 +2,7 @@
 
 import { useActionState, useEffect, useRef, useId } from "react";
 import { SubmitButton } from "@/components/salones/submit-button";
-import { DatePickerField } from "@/components/ui/date-picker-field";
 import {
-  FieldError,
   FormAlert,
   Input,
   Label,
@@ -35,9 +33,6 @@ export function PagoForm({ action, initialState, servicios, editing = false }: P
   const [state, formAction] = useActionState(action, initialState);
   const id = useId();
   const formRef = useRef<HTMLFormElement>(null);
-  const fechaPagoValue = state.successMessage && !editing
-    ? initialState.fields.fecha_pago
-    : state.fields.fecha_pago;
   const eventoServicioValue = state.successMessage && !editing
     ? initialState.fields.evento_servicio_id || "sin_asociar"
     : state.fields.evento_servicio_id || "sin_asociar";
@@ -52,26 +47,6 @@ export function PagoForm({ action, initialState, servicios, editing = false }: P
     <form ref={formRef} action={formAction} className="space-y-5" noValidate>
       <div className="grid gap-5 md:grid-cols-2">
         <PagoMoneyFields key={JSON.stringify([state.fields, state.successMessage])} state={state} />
-
-        <div>
-          <Label htmlFor={`${id}-fecha_pago`}>Fecha de pago</Label>
-          <DatePickerField
-            key={`fecha-pago-${fechaPagoValue}`}
-            id={`${id}-fecha_pago`}
-            name="fecha_pago"
-            required
-            defaultValue={fechaPagoValue}
-            aria-invalid={Boolean(state.errors.fecha_pago)}
-            aria-describedby={
-              state.errors.fecha_pago ? `${id}-fecha_pago-error` : undefined
-            }
-          />
-          {state.errors.fecha_pago ? (
-            <FieldError id={`${id}-fecha_pago-error`}>
-              {state.errors.fecha_pago}
-            </FieldError>
-          ) : null}
-        </div>
 
         <div>
           <Label htmlFor={`${id}-concepto`}>Concepto</Label>

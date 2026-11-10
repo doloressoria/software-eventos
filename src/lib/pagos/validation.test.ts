@@ -41,7 +41,7 @@ test("producto decimal exacto, redondeo a centavos y límites de PostgreSQL", ()
 
 test("igual equivalente ARS tiene igual IVA en efectivo ARS/USD y transferencia ARS/USD", () => {
   for (const [ars, usd] of [["efectivo_pesos", "efectivo_dolares"], ["transferencia", "transferencia"]]) {
-    const row = { importe_en_pesos: 121000, es_garantia: false };
+    const row = { importe_en_pesos: 121000, es_garantia: false, fecha_pago: "2026-01-01" };
     assert.deepEqual(calculateServicioPaymentTotals([{ ...row, moneda: "ARS", forma_pago: ars }], 0, 200000), calculateServicioPaymentTotals([{ ...row, moneda: "USD", importe_moneda_original: 100, forma_pago: usd }], 0, 200000));
   }
 });

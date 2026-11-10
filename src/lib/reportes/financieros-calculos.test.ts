@@ -51,19 +51,19 @@ test("consolida ingresos, egresos, neto, margen y promedios sin contar garantias
     {
       es_garantia: false,
       evento_id: "evento-1",
-      fecha_pago: "2026-06-01",
+      forma_pago: "transferencia", fecha_pago: "2026-06-01",
       importe_en_pesos: 1_000,
     },
     {
       es_garantia: true,
       evento_id: "evento-1",
-      fecha_pago: "2026-06-02",
+      forma_pago: "transferencia", fecha_pago: "2026-06-02",
       importe_en_pesos: 300,
     },
     {
       es_garantia: false,
       evento_id: "evento-2",
-      fecha_pago: "2026-06-05",
+      forma_pago: "transferencia", fecha_pago: "2026-06-05",
       importe_en_pesos: 500,
     },
   ];
@@ -104,13 +104,13 @@ test("agrupa por evento, mes, categoria, salon y vendedor sin duplicar importes"
     {
       es_garantia: false,
       evento_id: "evento-1",
-      fecha_pago: "2026-06-01",
+      forma_pago: "transferencia", fecha_pago: "2026-06-01",
       importe_en_pesos: 700,
     },
     {
       es_garantia: false,
       evento_id: "evento-1",
-      fecha_pago: "2026-07-01",
+      forma_pago: "transferencia", fecha_pago: "2026-07-01",
       importe_en_pesos: 300,
     },
   ];
@@ -165,7 +165,7 @@ test("respeta el universo de eventos ya filtrado por permisos o salon", () => {
       {
         es_garantia: false,
         evento_id: "evento-1",
-        fecha_pago: "2026-06-11",
+        forma_pago: "transferencia", fecha_pago: "2026-06-11",
         importe_en_pesos: 500,
       },
     ],
@@ -205,7 +205,7 @@ test("incluye catering externo en Kiria sin atribuirlo a un vendedor", () => {
       vendedor: "Ejecutiva de catering",
       vendedor_id: "",
     }],
-    pagos: [{ evento_id: "catering:contrato-1", fecha_pago: "2026-10-01", importe_en_pesos: 300, es_garantia: false }],
+    pagos: [{ evento_id: "catering:contrato-1", forma_pago: "transferencia", fecha_pago: "2026-10-01", importe_en_pesos: 300, es_garantia: false }],
     egresos: [{ evento_id: "catering:contrato-1", fecha_egreso: "2026-10-02", importe_en_pesos: 50, categoria: "Catering" }],
     resumenByEvento: new Map([["catering:contrato-1", {
       id: "catering:contrato-1", total_catering: 1_000, total_servicios: 0,
@@ -226,7 +226,7 @@ test("consolida USD a cotizaciones históricas y ARS usando sólo sus equivalent
     { importe_moneda_original: 100, moneda: "USD", tipo_cambio: 1200, importe_en_pesos: 120000 },
     { importe_moneda_original: 100, moneda: "USD", tipo_cambio: 1300, importe_en_pesos: 130000 },
     { importe_moneda_original: 500, moneda: "ARS", tipo_cambio: 1, importe_en_pesos: 500 },
-  ].map(p => ({ ...p, es_garantia: false, evento_id: "evento-1", fecha_pago: "2026-06-01" }));
+  ].map(p => ({ ...p, es_garantia: false, evento_id: "evento-1", forma_pago: "transferencia", fecha_pago: "2026-06-01" }));
   const reporte = buildReportesFinancieros({ eventos, resumenByEvento, egresos: [], pagos: [...pagos, { ...pagos[0], es_garantia: true }] });
   assert.equal(reporte.metricas.ingresos_cobrados, 250500);
   assert.equal(reporte.porEvento[0].ingresos_cobrados, 250500);

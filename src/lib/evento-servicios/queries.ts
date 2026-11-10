@@ -4,10 +4,7 @@ import {
   type MonthlyServicePriceSuggestions,
 } from "@/lib/precios-servicios/precios-mensuales";
 import { logSupabaseError } from "@/lib/supabase/errors";
-import {
-  getMoneyAmount,
-  isOrdinaryPayment,
-} from "@/lib/pagos/calculos";
+import { roundMoney, toMoneyNumber } from "@/lib/pagos/calculos";
 import type { Enums, Tables } from "@/types/database.types";
 
 export type ServicioCatalogoOption = Pick<
@@ -45,30 +42,9 @@ export type EventoServicioPagoOption = {
   saldoPendiente: number;
 };
 
-type PagoServicioRow = Pick<
-  Tables<"pagos">,
-  | "es_garantia"
-  | "evento_servicio_id"
-  | "importe_en_pesos"
-  | "importe_moneda_original"
-  | "moneda"
->;
-
-type EventoServicioRow = Omit<
-  EventoServicioItem,
-  "saldo_pendiente" | "servicios_catalogo" | "total_pagado"
-> & {
-  saldo_pendiente: number | null;
-  servicios_catalogo: Pick<
-    Tables<"servicios_catalogo">,
-    "categoria" | "descripcion" | "nombre"
-  > | null;
-  total_pagado: number | null;
-};
-
 export async function getEventoValores(eventoId: string) {
   const supabase = await createClient();
-  const [catalogoResult, serviciosResult, pagosResult] = await Promise.all([
+  const [catalogoResult, serviciosResult] = await Promise.all([
     supabase
       .from("servicios_catalogo")
       .select("id, nombre, categoria, descripcion, activo")
@@ -76,20 +52,12 @@ export async function getEventoValores(eventoId: string) {
       .order("categoria", { ascending: true })
       .order("nombre", { ascending: true }),
     supabase
-      .from("evento_servicios")
+      .from("v_evento_servicios_acreditados")
       .select(
         "id, evento_id, servicio_id, precio_base, adicionales_monto, iva_base_imponible, iva_porcentaje, total_sin_iva, total_con_iva, proveedor, total_pagado, saldo_pendiente, notas, comisiona_organizador, created_at, servicios_catalogo(nombre, categoria, descripcion)",
       )
       .eq("evento_id", eventoId)
       .order("created_at", { ascending: true }),
-    supabase
-      .from("pagos")
-      .select(
-        "es_garantia, evento_servicio_id, importe_en_pesos, importe_moneda_original, moneda",
-      )
-      .eq("evento_id", eventoId)
-      .is("deleted_at", null)
-      .not("evento_servicio_id", "is", null),
   ]);
 
   if (catalogoResult.error) {
@@ -102,29 +70,12 @@ export async function getEventoValores(eventoId: string) {
     throw new Error("No se pudieron obtener los valores del evento.");
   }
 
-  if (pagosResult.error) {
-    logSupabaseError("getEventoValores pagos", pagosResult.error);
-    throw new Error("No se pudieron obtener los pagos asociados a servicios.");
-  }
-
-  const pagosPorServicio = getPagosPorServicio(pagosResult.data as PagoServicioRow[]);
   const catalogo = catalogoResult.data as ServicioCatalogoOption[];
   const monthlyPriceSuggestions = await getMonthlyServicePricesForEvent(
     eventoId,
     catalogo.map((servicio) => servicio.id),
   );
-  const servicios = (serviciosResult.data as EventoServicioRow[]).map(
-    (servicio) => {
-      const totalConIva = toMoneyNumber(servicio.total_con_iva);
-      const totalPagado = pagosPorServicio.get(servicio.id) ?? 0;
-
-      return {
-        ...servicio,
-        saldo_pendiente: roundMoney(totalConIva - totalPagado),
-        total_pagado: totalPagado,
-      };
-    },
-  );
+  const servicios = serviciosResult.data as EventoServicioItem[];
 
   return {
     catalogo,
@@ -161,23 +112,6 @@ export function getCategoriaServicioLabel(value: Enums<"categoria_servicio">) {
   return labels[value] ?? value;
 }
 
-function getPagosPorServicio(pagos: PagoServicioRow[]) {
-  const pagosPorServicio = new Map<string, number>();
-
-  for (const pago of pagos) {
-    if (!pago.evento_servicio_id || !isOrdinaryPayment(pago)) {
-      continue;
-    }
-
-    const monto = getMoneyAmount(pago);
-    const current = pagosPorServicio.get(pago.evento_servicio_id) ?? 0;
-
-    pagosPorServicio.set(pago.evento_servicio_id, roundMoney(current + monto));
-  }
-
-  return pagosPorServicio;
-}
-
 function getOpcionesPago(
   servicios: EventoServicioItem[],
 ): EventoServicioPagoOption[] {
@@ -186,12 +120,4 @@ function getOpcionesPago(
     label: servicio.servicios_catalogo?.nombre ?? "Servicio sin nombre",
     saldoPendiente: servicio.saldo_pendiente,
   }));
-}
-
-function toMoneyNumber(value: number | null | undefined) {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
-function roundMoney(value: number) {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
 }

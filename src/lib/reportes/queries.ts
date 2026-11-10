@@ -3,6 +3,7 @@ import { getCurrentProfile, type CurrentProfile } from "@/lib/auth";
 import { getAssignedActiveSalones } from "@/lib/eventos/queries";
 import {
   getMoneyAmount,
+  getArgentinaPaymentDay,
   isOrdinaryPayment,
   sumGuarantees,
   sumOrdinaryPayments,
@@ -173,7 +174,7 @@ type ReporteEvento = Pick<
 // come from queries filtered by .in("evento_id", eventoIds), so it's
 // guaranteed non-null here.
 type ReportePago = Omit<
-  Pick<Tables<"pagos">, "es_garantia" | "evento_id" | "fecha_pago" | "importe_en_pesos">,
+  Pick<Tables<"pagos">, "es_garantia" | "evento_id" | "fecha_pago" | "forma_pago" | "importe_en_pesos">,
   "evento_id"
 > & { evento_id: string };
 
@@ -229,7 +230,7 @@ type CateringExternoReporte = Pick<
   "id" | "cliente_nombre" | "fecha_evento" | "lugar_evento" | "total_con_iva" | "saldo_pendiente"
 >;
 
-type CateringMovimientoPago = Pick<Tables<"pagos">, "catering_contrato_id" | "fecha_pago" | "importe_en_pesos" | "es_garantia">;
+type CateringMovimientoPago = Pick<Tables<"pagos">, "catering_contrato_id" | "fecha_pago" | "importe_en_pesos" | "es_garantia" | "forma_pago">;
 type CateringMovimientoEgreso = Pick<Tables<"egresos">, "catering_contrato_id" | "fecha_egreso" | "importe_en_pesos" | "categoria">;
 
 const ANTICIPACION_RANGOS = [
@@ -465,7 +466,7 @@ async function getVendedoresOptions() {
 async function getCateringsExternos(): Promise<CateringExternoReporte[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
-    .from("catering_contratos")
+    .from("v_catering_acreditado")
     .select("id, cliente_nombre, fecha_evento, lugar_evento, total_con_iva, saldo_pendiente")
     .is("evento_id", null)
     .is("deleted_at", null);
@@ -474,7 +475,7 @@ async function getCateringsExternos(): Promise<CateringExternoReporte[]> {
     logSupabaseError("getReportesGenerales catering externo", error);
     throw new Error("No se pudieron obtener los caterings externos del reporte.");
   }
-  return data;
+  return data.filter((row): row is CateringExternoReporte => row.id !== null);
 }
 
 async function getMovimientosExternos(
@@ -486,11 +487,12 @@ async function getMovimientosExternos(
   // ponytail: IDs travel in the query URL; switch to a joined query if Kiria grows past URL limits.
   const ids = contratos.map((row) => row.id);
   const pagosQuery = supabase.from("pagos")
-    .select("catering_contrato_id, fecha_pago, importe_en_pesos, es_garantia")
+    .select("catering_contrato_id, fecha_pago, forma_pago, importe_en_pesos, es_garantia")
     .in("catering_contrato_id", ids).is("deleted_at", null);
   const egresosQuery = supabase.from("egresos")
     .select("catering_contrato_id, fecha_egreso, importe_en_pesos, categoria")
     .in("catering_contrato_id", ids).is("deleted_at", null);
+  pagosQuery.or(`forma_pago.neq.cheque,fecha_pago.lte.${getArgentinaPaymentDay()}`);
   applyDateFilters(pagosQuery, filters, "fecha_pago");
   applyDateFilters(egresosQuery, filters, "fecha_egreso");
   const [pagos, egresos] = await Promise.all([pagosQuery, egresosQuery]);
@@ -553,11 +555,12 @@ async function getPagosReporte({
   const query = supabase
     .from("pagos")
     .select(
-      "evento_id, fecha_pago, importe_en_pesos, es_garantia, eventos!inner(salon_id, vendedor_id, estado, deleted_at)",
+      "evento_id, fecha_pago, forma_pago, importe_en_pesos, es_garantia, eventos!inner(salon_id, vendedor_id, estado, deleted_at)",
     )
     .is("deleted_at", null)
     .is("eventos.deleted_at", null);
 
+  query.or(`forma_pago.neq.cheque,fecha_pago.lte.${getArgentinaPaymentDay()}`);
   applyMovimientoFilters(query, filters, "fecha_pago");
 
   if (allowedSalonIds !== null) {
@@ -617,10 +620,11 @@ async function getPagosEventosReporte(
   const supabase = await createClient();
   const query = supabase
     .from("pagos")
-    .select("evento_id, fecha_pago, importe_en_pesos, es_garantia")
+    .select("evento_id, fecha_pago, forma_pago, importe_en_pesos, es_garantia")
     .in("evento_id", eventoIds)
     .is("deleted_at", null);
 
+  query.or(`forma_pago.neq.cheque,fecha_pago.lte.${getArgentinaPaymentDay()}`);
   applyDateFilters(query, filters, "fecha_pago");
 
   const { data, error } = await query;
