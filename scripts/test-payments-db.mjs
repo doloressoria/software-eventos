@@ -13,7 +13,9 @@ const usd = process.argv.includes("--usd");
 const contactos = process.argv.includes("--contactos");
 const balances = process.argv.includes("--balances");
 const catering = process.argv.includes("--catering");
-const cobertura = process.argv.includes("--cobertura");
+const ipcCron = process.argv.includes("--ipc-cron");
+const ipc = ipcCron || process.argv.includes("--ipc");
+const cobertura = ipc || process.argv.includes("--cobertura");
 const imputaciones = cobertura || process.argv.includes("--imputaciones");
 const cheques = process.argv.includes("--cheques");
 const expenses = process.argv.includes("--expenses");
@@ -21,7 +23,7 @@ try {
   execFileSync(pg("initdb"), ["-D", join(dir, "data"), "-U", "postgres",
     "-A", "trust", "-E", "UTF8", "--no-locale"], { stdio: "pipe" });
   execFileSync(pg("pg_ctl"), ["-D", join(dir, "data"), "-l", join(dir, "server.log"),
-    "-o", `-h '' -p 5432 -k '${dir}'`, "-w", "start"], { stdio: "pipe" });
+    "-o", `-h '' -p 5432 -k '${dir}'${ipcCron ? " -c shared_preload_libraries=pg_cron -c cron.database_name=postgres -c cron.use_background_workers=on" : ""}`, "-w", "start"], { stdio: "pipe" });
   started = true;
   const sql = [
     "begin;",
@@ -50,7 +52,23 @@ try {
         readFileSync("supabase/tests/catering-cobertura.sql", "utf8"),
         readFileSync("supabase/verification/postflight-catering-por-personas.sql", "utf8"),
       ] : []),
-      "rollback;",
+      ...(ipc ? [
+        readFileSync("supabase/tests/fixtures/ipc-baseline.sql", "utf8"),
+        readFileSync("supabase/verification/preflight-ipc-programado.sql", "utf8"),
+        "create temporary table ipc_servicios_antes as select to_jsonb(s) as datos from public.evento_servicios s;",
+        "create temporary table ipc_catering_antes as select to_jsonb(c) as datos from public.catering_contratos c;",
+        readFileSync("supabase/migrations/20261110224729_ipc_vigencia_programada.sql", "utf8")
+          .replace(/^begin;\n|\ncommit;\n$/g, ""),
+        readFileSync("supabase/tests/ipc-programado.sql", "utf8"),
+        ...(ipcCron ? [
+          "create extension pg_cron;",
+          readFileSync("supabase/migrations/20261110224738_programar_ipc_cron.sql", "utf8")
+            .replace(/^begin;\n|\ncommit;\n$/g, ""),
+        ] : []),
+        readFileSync("supabase/verification/postflight-ipc-programado.sql", "utf8"),
+        ...(ipcCron ? [readFileSync("supabase/verification/postflight-ipc-cron.sql", "utf8")] : []),
+        "commit;",
+      ] : ["rollback;"]),
     ] : catering ? [
       readFileSync("supabase/migrations/20261021145259_unblock_payments_and_summary_access.sql", "utf8"),
       readFileSync("supabase/migrations/20261021152307_evento_contactos.sql", "utf8"),
@@ -125,6 +143,8 @@ try {
   console.log(`${(result.stderr.match(/PASS:/g) || []).length} comprobaciones SQL aprobadas.`);
   if (contactos) await checkConcurrentPrincipals();
   if (catering) await checkConcurrentCatering();
+  if (ipc) { checkIpcTypes(); await checkConcurrentIpc(); }
+  if (ipcCron) await checkIpcCron();
   console.log("PostgreSQL: pruebas aprobadas; el cluster efímero se elimina al terminar.");
 } catch (error) {
   console.error(error.message);
@@ -199,4 +219,105 @@ async function checkConcurrentCatering() {
     from catering_contratos where id='${id}';`], { encoding: "utf8" }).trim();
   assert.equal(row, "1875.50|300.00|1575.50");
   console.log("Concurrencia real: dos adicionales y dos pagos conservan total, cobrado y saldo.");
+}
+
+async function checkConcurrentIpc() {
+  const args = ["-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1",
+    "-h", dir, "-p", "5432", "-U", "postgres", "-d", "postgres"];
+  const run = (sql) => execFileSync(pg("psql"), [...args, "-c", sql], { encoding: "utf8" }).trim();
+  run(`set eventos.test_dia = '2026-11-20';
+    select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);
+    select public.programar_ipc('2027-02-01','2026-11-20',10);`);
+  await Promise.all([1, 2].map(() => new Promise((resolve, reject) => {
+    const child = spawn(pg("psql"), [...args, "-c", `begin; set local eventos.test_dia = '2026-11-20';
+      select software_eventos_private.ejecutar_ipc_programados(); select pg_sleep(.2); commit;`]);
+    let stderr = "";
+    child.stdout.resume();
+    child.stderr.on("data", (data) => { stderr += data; });
+    child.on("error", reject);
+    child.on("close", (status) => status === 0 ? resolve() : reject(new Error(stderr)));
+  })));
+  assert.equal(run(`select count(*) from public.ipc_programaciones where periodo='2027-02-01' and estado='aplicado'`), "1");
+  assert.equal(run(`select count(*) from (select evento_servicio_id,catering_contrato_id from public.ipc_aplicaciones
+    where programacion_id=(select id from public.ipc_programaciones where periodo='2027-02-01')
+    group by evento_servicio_id,catering_contrato_id having count(*)<>1) duplicados`), "0");
+  assert.equal(run(`select count(*) > 0 and bool_and(incremento=round(base_ajustada*.1,2)) from public.ipc_aplicaciones
+    where programacion_id=(select id from public.ipc_programaciones where periodo='2027-02-01')`), "t");
+  console.log("Concurrencia real: dos workers aplican una sola vez cada destino del período.");
+  run(`set eventos.test_dia='2026-11-20';
+    select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);
+    select programar_ipc('2027-03-01','2026-11-20',10);`);
+  let ready;
+  const paymentReady = new Promise((resolve) => { ready = resolve; });
+  const payment = new Promise((resolve, reject) => {
+    const child = spawn(pg("psql"), [...args, "-c", `begin; set local eventos.test_dia='2026-11-20';
+      select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',true);
+      insert into pagos(evento_id,evento_servicio_id,forma_pago,fecha_pago,importe_moneda_original)
+        select evento_id,id,'efectivo_pesos','2026-11-20',round(saldo_pendiente,2)
+        from evento_servicios where id='00000000-0000-0000-0000-000000000370';
+      select 'ipc-payment-ready'; select pg_sleep(.5); commit;`]);
+    let stderr = "";
+    child.stdout.on("data", (data) => { if (data.toString().includes("ipc-payment-ready")) ready(); });
+    child.stderr.on("data", (data) => { stderr += data; });
+    child.on("error", (error) => { ready(); reject(error); });
+    child.on("close", (status) => {
+      ready();
+      if (status === 0) resolve();
+      else reject(new Error(stderr));
+    });
+  });
+  await paymentReady;
+  const worker = new Promise((resolve, reject) => {
+    const child = spawn(pg("psql"), [...args, "-c", `set eventos.test_dia='2026-11-20'; select software_eventos_private.ejecutar_ipc_programados();`]);
+    let stderr = "";
+    child.stdout.resume();
+    child.stderr.on("data", (data) => { stderr += data; });
+    child.on("error", reject);
+    child.on("close", (status) => status === 0 ? resolve() : reject(new Error(stderr)));
+  });
+  await Promise.all([payment, worker]);
+  assert.equal(run(`select base_ajustada=0 and incremento=0 from ipc_aplicaciones
+    where evento_servicio_id='00000000-0000-0000-0000-000000000370'
+    and programacion_id=(select id from ipc_programaciones where periodo='2027-03-01')`), "t");
+  console.log("Concurrencia real: IPC espera un cobro en curso y ajusta el saldo confirmado al obtener el bloqueo.");
+}
+
+async function checkIpcCron() {
+  const args = ["-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1",
+    "-h", dir, "-p", "5432", "-U", "postgres", "-d", "postgres"];
+  const query = (sql) => execFileSync(pg("psql"), [...args, "-c", sql], { encoding: "utf8" }).trim();
+  assert.equal(query("select schedule || '|' || command from cron.job where jobname='software-eventos-aplicar-ipc'"),
+    "* * * * *|select software_eventos_private.ejecutar_ipc_programados()");
+  query(`create or replace function software_eventos_private.dia_argentina(p_instante timestamptz default statement_timestamp())
+    returns date language sql stable set search_path='' as $$select '2026-11-20'::date$$;
+    select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);
+    select public.programar_ipc('2027-04-01','2026-11-20',10);
+    select cron.alter_job(jobid, schedule => '1 second') from cron.job where jobname='software-eventos-aplicar-ipc';`);
+  const deadline = Date.now() + 15000;
+  while (query("select estado from ipc_programaciones where periodo='2027-04-01'") !== "aplicado") {
+    assert.ok(Date.now() < deadline, "Cron no ejecuto el IPC dentro de 15 segundos");
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  assert.equal(query(`select count(*)>0 from cron.job_run_details r join cron.job j using(jobid)
+    where j.jobname='software-eventos-aplicar-ipc' and r.status='succeeded'`), "t");
+  console.log("Cron real: migracion registra la tarea y pg_cron ejecuta IPC sin JWT.");
+}
+
+function checkIpcTypes() {
+  const args = ["-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1",
+    "-h", dir, "-p", "5432", "-U", "postgres", "-d", "postgres"];
+  const rows = JSON.parse(execFileSync(pg("psql"), [...args, "-c", `select json_agg(c) from (
+    select table_name, array_agg(column_name order by column_name) as columns
+    from information_schema.columns where table_schema='public' and table_name in
+      ('ipc_programaciones','ipc_aplicaciones','v_ipc_programaciones','evento_servicios','catering_contratos',
+       'v_evento_servicios_acreditados','v_catering_acreditado') group by table_name) c`], { encoding: "utf8" }));
+  const source = readFileSync("src/types/database.types.ts", "utf8");
+  for (const row of rows) {
+    const start = source.indexOf(`      ${row.table_name}: {`);
+    assert.ok(start >= 0, row.table_name);
+    const block = source.slice(start).split("        Row: {")[1].split("        }")[0];
+    const names = [...block.matchAll(/^          (\w+):/gm)].map((m) => m[1]).sort();
+    assert.deepEqual(names, row.columns, `${row.table_name}: tipos y catalogo deben tener las mismas columnas`);
+  }
+  console.log("Contratos TypeScript: columnas de IPC, tablas y vistas coinciden con el catalogo aislado.");
 }

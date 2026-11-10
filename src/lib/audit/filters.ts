@@ -26,6 +26,8 @@ export const AUDITED_TABLES = [
   "salones",
   "servicios_catalogo",
   "servicio_precios_mensuales",
+  "ipc_programaciones",
+  "ipc_aplicaciones",
   "ipc_indices",
   "actualizaciones_ipc",
 ] as const;

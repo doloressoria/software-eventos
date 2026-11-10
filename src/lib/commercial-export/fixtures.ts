@@ -25,11 +25,11 @@ export function exampleEvent(paymentCount = 8): EventExportData {
   } as ExportEvent;
   const services = [
     { id: fixtureId(2), evento_id: event.id, servicio_id: fixtureId(12), precio_base: 10000, adicionales_monto: 500,
-      iva_base_imponible: 2000, iva_porcentaje: 0.21, total_sin_iva: 10500, total_con_iva: 10920, total_pagado: 0, saldo_pendiente: 10920,
+      ajuste_ipc: 0, iva_base_imponible: 2000, iva_porcentaje: 0.21, total_sin_iva: 10500, total_con_iva: 10920, total_pagado: 0, saldo_pendiente: 10920,
       proveedor: "Proveedor ficticio", notas: "IVA aplicado sólo a la base imponible guardada.", comisiona_organizador: true,
       created_at: event.created_at, updated_at: event.updated_at, servicios_catalogo: { nombre: "Salón", categoria: "salon" } },
     { id: fixtureId(3), evento_id: event.id, servicio_id: fixtureId(13), precio_base: 500, adicionales_monto: 0,
-      iva_base_imponible: 0, iva_porcentaje: 0.21, total_sin_iva: 500, total_con_iva: 500, total_pagado: 0, saldo_pendiente: 500,
+      ajuste_ipc: 0, iva_base_imponible: 0, iva_porcentaje: 0.21, total_sin_iva: 500, total_con_iva: 500, total_pagado: 0, saldo_pendiente: 500,
       proveedor: "Técnica de ejemplo", notas: null, comisiona_organizador: false, created_at: event.created_at, updated_at: event.updated_at,
       servicios_catalogo: { nombre: "Servicio fuera de los bloques originales", categoria: "tecnica" } },
   ] as ExportService[];
@@ -55,7 +55,7 @@ export function exampleCatering({ linked = true, mismatch = false, paymentCount 
     tipo_servicio: "Menú de demostración", tipo_evento: "Social", salon_id: null, lugar_evento: linked ? null : "Predio externo de ejemplo", ejecutiva_id: fixtureId(11),
     pax_adultos: 10, pax_jovenes: 2, pax_menores: 0, pax_bebes: 0, pax_comida: 12, pax_post_postre: 0, pax_final: 12,
     precio_cierre_alimentos_sin_iva: null, precio_cierre_bebidas_sin_iva: null, iva_porcentaje: 0.21, comision_organizador_monto: 200, iva_comision: 0.21,
-    total_sin_iva: net + 200, total_con_iva: total + (mismatch ? 100 : 0), total_pagado: paid, saldo_pendiente: total + (mismatch ? 100 : 0) - paid,
+    ajuste_ipc: 0, total_sin_iva: net + 200, total_con_iva: total + (mismatch ? 100 : 0), total_pagado: paid, saldo_pendiente: total + (mismatch ? 100 : 0) - paid,
     emite_factura: true, monto_con_factura: total, monto_sin_factura: 0, factura_razon_social: "Ejemplo SA", factura_cuit: "CUIT ficticio",
     factura_direccion: "Calle ficticia 123", factura_concepto: "Servicio de ejemplo", factura_contacto_admin: "administracion@example.invalid",
     notas: "Datos ficticios. Los pagos no se asignan a versiones de precios.", deleted_at: null, created_at: event.created_at, updated_at: event.updated_at,

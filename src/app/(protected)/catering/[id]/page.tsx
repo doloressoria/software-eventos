@@ -136,6 +136,7 @@ export default async function CateringDetallePage({
               label="IVA catering"
               value={formatPercentage(catering.iva_porcentaje)}
             />
+            {catering.ajuste_ipc !== 0 && <DetailItem label="Ajuste IPC (por importe)" value={formatCurrency(catering.ajuste_ipc)} />}
             <DetailItem
               label="Total del catering"
               value={formatCurrency(catering.total_con_iva ?? 0)}

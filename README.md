@@ -310,3 +310,15 @@ y la prueba aislada `pnpm test:imputaciones:db`.
 
 Los [cobros de catering por personas](docs/catering-por-personas.md) tienen un
 runbook de publicación manual y la prueba aislada `pnpm test:cobertura:db`.
+
+### IPC programado por fecha de vigencia
+
+El módulo permite separar el período del índice de su vigencia, previsualizar
+saldos y programar la ejecución automática en fecha argentina. Incluye saldos
+parcialmente pagados y catering PAX de eventos confirmados. Los externos quedan
+excluidos. Ver [SQL en orden, compatibilidad y límites históricos](docs/ipc-programado.md)
+antes de publicar. No recuperar una vigencia pasada usando el saldo actual.
+
+```sh
+PG_BIN=/opt/homebrew/opt/postgresql@17/bin pnpm test:ipc:db
+```

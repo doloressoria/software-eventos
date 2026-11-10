@@ -226,3 +226,25 @@ test("el Excel de catering conserva el importe histórico y toma el saldo SQL de
   assert.deepEqual(rows, [[15, 44000, 1000, 45000, 225000], [10, 40000, 400000, 0, null]]);
   assert.equal(amount(book, "DC", "Saldo pendiente — detalle", 8), 225000);
 });
+
+test("IPC monetario se exporta separado del IVA y conserva el saldo de catering", async () => {
+  const event = exampleEvent(0);
+  event.services[0].ajuste_ipc = 4000;
+  event.services[0].total_con_iva! += 4000;
+  event.services[0].saldo_pendiente! += 4000;
+  const book = await buildCommercialWorkbook(event);
+  assert.ok(texts(book).some((text) => text.startsWith("Ajuste IPC incluido en el total:")));
+  let vat: ExcelJS.CellValue;
+  book.getWorksheet("CLIENTE")!.eachRow((row) => {
+    if (row.getCell(1).value === "Salón" && row.getCell(2).value === 10500 && row.getCell(3).value === 2000) vat = row.getCell(5).value;
+  });
+  assert.equal(vat, 420);
+  const catering = exampleCatering({ paymentCount: 0 });
+  catering.catering.ajuste_ipc = 20000;
+  catering.catering.total_con_iva! += 20000;
+  catering.catering.saldo_pendiente! += 20000;
+  catering.costos.total_con_iva! += 20000;
+  const cateringBook = await buildCommercialWorkbook(catering);
+  assert.equal(amount(cateringBook, "DC", "Ajuste IPC incluido — cargo por importe, separado del IVA", 8), 20000);
+  assert.equal(amount(cateringBook, "DC", "Saldo pendiente — detalle", 8), catering.catering.saldo_pendiente);
+});

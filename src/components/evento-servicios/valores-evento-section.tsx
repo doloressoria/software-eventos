@@ -159,6 +159,7 @@ export function ValoresEventoSection({
                         label="Adic."
                         value={formatCurrencyValue(servicio.adicionales_monto)}
                       />
+                      {servicio.ajuste_ipc !== 0 && <ValueItem align="right" label="Ajuste IPC" value={formatCurrencyValue(servicio.ajuste_ipc)} />}
                       <ValueItem
                         align="right"
                         label="Base IVA"

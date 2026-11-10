@@ -1,117 +1,62 @@
 export type IpcFormFields = {
   periodo: string;
+  fecha_vigencia: string;
   variacion_porcentual: string;
 };
-
 export type IpcFormErrors = Partial<Record<keyof IpcFormFields, string>>;
-
-export type IpcPayload = {
-  periodo: string;
-  variacionPorcentual: number;
+export type IpcPayload = { periodo: string; fechaVigencia: string; variacionPorcentual: number | null };
+export type IpcPreviewRow = {
+  evento_nombre: string;
+  destino_nombre: string;
+  evento_id: string;
+  evento_servicio_id: string | null;
+  catering_contrato_id: string | null;
+  saldo_anterior: number;
+  incremento: number;
+  saldo_proyectado: number;
 };
-
-export type IpcSummary = {
-  cantidadEventos: number;
-  cantidadServicios: number;
-  montoPrecioBaseAnterior: number;
-  montoPrecioBaseActualizado: number;
-  montoTotalConIvaAnterior: number;
-  montoTotalConIvaActualizado: number;
-};
-
 export type IpcFormState = {
   errors: IpcFormErrors;
   fields: IpcFormFields;
   formError: string | null;
   successMessage: string | null;
-  summary: IpcSummary | null;
+  preview: IpcPreviewRow[] | null;
 };
 
-export const emptyIpcFormFields: IpcFormFields = {
-  periodo: getCurrentMonthValue(),
-  variacion_porcentual: "",
-};
+export function getArgentinaDate(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Argentina/Buenos_Aires",
+  }).formatToParts(now);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
 
 export function getEmptyIpcFormState(): IpcFormState {
-  return {
-    errors: {},
-    fields: emptyIpcFormFields,
-    formError: null,
-    successMessage: null,
-    summary: null,
-  };
+  const today = getArgentinaDate();
+  return { errors: {}, fields: { periodo: today.slice(0, 7), fecha_vigencia: today, variacion_porcentual: "" },
+    formError: null, successMessage: null, preview: null };
 }
 
-export function validateIpcForm(formData: FormData): {
-  errors: IpcFormErrors;
-  fields: IpcFormFields;
-  payload: IpcPayload | null;
-} {
-  const fields: IpcFormFields = {
-    periodo: getString(formData, "periodo"),
-    variacion_porcentual: getString(formData, "variacion_porcentual"),
-  };
+export function validateIpcForm(formData: FormData, today = getArgentinaDate()) {
+  const fields = Object.fromEntries(["periodo", "fecha_vigencia", "variacion_porcentual"].map((key) => {
+    const value = formData.get(key);
+    return [key, typeof value === "string" ? value.trim() : ""];
+  })) as IpcFormFields;
   const errors: IpcFormErrors = {};
-  const periodo = parsePeriod(fields.periodo);
-  const variacionPorcentual = parsePercentage(fields.variacion_porcentual);
-
-  if (!periodo) {
-    errors.periodo = "Selecciona un período mensual válido.";
+  if (!/^[1-9]\d{3}-(0[1-9]|1[0-2])$/.test(fields.periodo)) errors.periodo = "Seleccioná un período mensual válido.";
+  const date = new Date(`${fields.fecha_vigencia}T00:00:00.000Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fields.fecha_vigencia) || Number.isNaN(date.getTime()) ||
+    date.toISOString().slice(0, 10) !== fields.fecha_vigencia || fields.fecha_vigencia < today) {
+    errors.fecha_vigencia = "Elegí hoy o una fecha futura válida de Argentina.";
   }
-
-  if (variacionPorcentual === null) {
-    errors.variacion_porcentual =
-      "Ingresa una variación válida mayor a -100%.";
+  const raw = fields.variacion_porcentual.replace(",", ".");
+  const value = Number(raw);
+  const variation = Math.round((value + Number.EPSILON) * 10_000) / 10_000;
+  if (raw && (!/^[+-]?(\d+(\.\d*)?|\.\d+)$/.test(raw) || !Number.isFinite(variation) || variation <= -100 || variation >= 100_000_000)) {
+    errors.variacion_porcentual = "Ingresá una variación mayor a -100% y menor a 100.000.000%.";
   }
-
-  if (!periodo || variacionPorcentual === null) {
-    return { errors, fields, payload: null };
-  }
-
-  return {
-    errors,
-    fields,
-    payload: { periodo, variacionPorcentual },
+  const payload: IpcPayload | null = Object.keys(errors).length ? null : {
+    periodo: `${fields.periodo}-01`, fechaVigencia: fields.fecha_vigencia, variacionPorcentual: raw ? variation : null,
   };
-}
-
-function parsePeriod(value: string) {
-  const match = /^(\d{4})-(\d{2})$/.exec(value.trim());
-
-  if (!match) return null;
-
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-
-  if (!Number.isInteger(year) || month < 1 || month > 12) return null;
-
-  return `${match[1]}-${match[2]}-01`;
-}
-
-function parsePercentage(value: string) {
-  const normalized = value.trim().replace(",", ".");
-
-  if (!normalized) return null;
-
-  const parsed = Number(normalized);
-
-  if (!Number.isFinite(parsed) || parsed <= -100) return null;
-
-  return Math.round((parsed + Number.EPSILON) * 10_000) / 10_000;
-}
-
-function getString(formData: FormData, name: keyof IpcFormFields) {
-  const value = formData.get(name);
-  return typeof value === "string" ? value : "";
-}
-
-function getCurrentMonthValue() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    month: "2-digit",
-    timeZone: "America/Argentina/Buenos_Aires",
-    year: "numeric",
-  }).formatToParts(new Date());
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-
-  return `${values.year}-${values.month}`;
+  return { errors, fields, payload };
 }

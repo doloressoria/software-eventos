@@ -1,7 +1,6 @@
 import Link from "next/link";
 import {
-  applyIpcAction,
-  previewIpcAction,
+  ipcAction,
 } from "@/app/(protected)/admin/actualizaciones-ipc/actions";
 import { IpcApplicationForm } from "@/components/ipc/ipc-application-form";
 import { buttonVariants } from "@/components/ui/button";
@@ -36,14 +35,14 @@ type IpcIndexRow = {
 
 export default async function ActualizacionesIpcPage() {
   await requireAdmin();
-  const indices = await getRecentIpcIndices();
+  const [indices, schedules] = await Promise.all([getRecentIpcIndices(), getSchedules()]);
 
   return (
     <section className="space-y-6">
       <PageHeader
         eyebrow="Admin"
         title="Actualización por IPC"
-        description="Actualiza precios base de servicios impagos en eventos confirmados y vigentes."
+        description="Programá ajustes sobre saldos pendientes de servicios y catering de eventos confirmados."
         actions={
           <Link href="/admin" className={buttonVariants({ variant: "secondary" })}>
             Volver a admin
@@ -55,26 +54,43 @@ export default async function ActualizacionesIpcPage() {
         <CardHeader>
           <CardTitle>Nuevo IPC mensual</CardTitle>
           <CardDescription>
-            Antes de confirmar se calcula el alcance actual. Si se registra un
-            pago entre la previsualización y la aplicación, el proceso vuelve a
-            validar la elegibilidad.
+            El período identifica el índice. La vigencia indica qué día se ejecuta,
+            con fecha local argentina. Sin índice, el ajuste queda sin aplicar.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <IpcApplicationForm
-            applyAction={applyIpcAction}
+            action={ipcAction}
             emptyState={getEmptyIpcFormState()}
-            previewAction={previewIpcAction}
           />
         </CardContent>
       </Card>
 
       <Card>
+        <CardHeader><CardTitle>Programaciones y resultados</CardTitle></CardHeader>
+        <CardContent>
+          <p className="mb-4 text-sm text-slate-600">Para cargar un índice faltante o reprogramar una fecha, completá el formulario con el mismo período. Los índices registrados y las ejecuciones aplicadas son inmutables.</p>
+          <div className="overflow-x-auto"><Table>
+            <TableHeader><TableRow>{["Período", "Vigencia", "Índice", "Estado / motivo", "Destinos", "Base ajustada", "Incremento", "Saldo resultante", "Ejecutado"].map((label) => <TableHead key={label}>{label}</TableHead>)}</TableRow></TableHeader>
+            <TableBody>{schedules.map((item) => <TableRow key={item.id}>
+              <TableCell>{formatPeriod(item.periodo)}</TableCell>
+              <TableCell>{formatDay(item.fecha_vigencia)}</TableCell>
+              <TableCell>{item.variacion_porcentual === null ? "Sin índice" : formatPercentage(item.variacion_porcentual)}</TableCell>
+              <TableCell><p>{({ pendiente: "Pendiente", sin_indice: "Sin índice", aplicado: "Aplicado", revision: "Requiere revisión", error: "Error; pendiente de reintento" })[item.estado ?? ""] ?? item.estado}</p><p className="text-sm text-slate-600">{item.motivo}</p></TableCell>
+              <TableCell>{item.cantidad_destinos}</TableCell>
+              <TableCell>{item.estado === "aplicado" ? money(item.base_ajustada) : "—"}</TableCell>
+              <TableCell>{item.estado === "aplicado" ? money(item.incremento) : "—"}</TableCell>
+              <TableCell>{item.estado === "aplicado" ? money(item.saldo_resultante) : "—"}</TableCell>
+              <TableCell>{item.ejecutado_at ? formatDate(item.ejecutado_at) : "—"}</TableCell>
+            </TableRow>)}{!schedules.length && <TableRow><TableCell colSpan={9}>Sin programaciones.</TableCell></TableRow>}</TableBody>
+          </Table></div>
+        </CardContent>
+      </Card>
+      <Card>
         <CardHeader>
-          <CardTitle>IPCs aplicados</CardTitle>
+          <CardTitle>Índices registrados y aplicaciones anteriores</CardTitle>
           <CardDescription>
-            Cada período puede registrarse una sola vez y queda vinculado a los
-            servicios que modificó.
+            Cada período tiene un índice. La columna de servicios muestra sólo las aplicaciones del flujo anterior; los resultados programados se muestran arriba.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -84,8 +100,8 @@ export default async function ActualizacionesIpcPage() {
                 <TableRow>
                   <TableHead>Período</TableHead>
                   <TableHead className="text-right">Variación</TableHead>
-                  <TableHead className="text-right">Servicios</TableHead>
-                  <TableHead>Aplicado por</TableHead>
+                  <TableHead className="text-right">Servicios anteriores</TableHead>
+                  <TableHead>Cargado por</TableHead>
                   <TableHead>Fecha</TableHead>
                 </TableRow>
               </TableHeader>
@@ -107,7 +123,7 @@ export default async function ActualizacionesIpcPage() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={5} className="py-8 text-center text-slate-500">
-                      Todavía no hay IPCs aplicados.
+                      Todavía no hay índices registrados.
                     </TableCell>
                   </TableRow>
                 )}
@@ -130,12 +146,13 @@ async function getRecentIpcIndices(): Promise<IpcIndexRow[]> {
     .order("periodo", { ascending: false })
     .limit(30);
 
-  if (error) return [];
+  if (error) throw new Error("No se pudo leer el historial de índices IPC.");
 
   return (data ?? []) as unknown as IpcIndexRow[];
 }
 
-function formatPeriod(value: string) {
+function formatPeriod(value: string | null) {
+  if (value === null) return "—";
   return new Intl.DateTimeFormat("es-AR", {
     month: "long",
     timeZone: "UTC",
@@ -155,4 +172,20 @@ function formatDate(value: string) {
     timeStyle: "short",
     timeZone: "America/Argentina/Buenos_Aires",
   }).format(new Date(value));
+}
+
+async function getSchedules() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("v_ipc_programaciones").select("*")
+    .order("fecha_vigencia", { ascending: false }).order("periodo", { ascending: false }).limit(30);
+  if (error) throw new Error("No se pudieron leer las programaciones de IPC.");
+  return data ?? [];
+}
+function formatDay(value: string | null) {
+  if (value === null) return "—";
+  return new Intl.DateTimeFormat("es-AR", { timeZone: "UTC" }).format(new Date(`${value}T00:00:00Z`));
+}
+function money(value: number | null) {
+  if (value === null) return "—";
+  return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(value);
 }

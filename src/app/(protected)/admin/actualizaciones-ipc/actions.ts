@@ -2,166 +2,50 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import {
-  getEmptyIpcFormState,
-  type IpcFormState,
-  type IpcSummary,
-  validateIpcForm,
-} from "@/lib/ipc/validation";
-import { logSupabaseError } from "@/lib/supabase/errors";
+import { getEmptyIpcFormState, type IpcFormState, validateIpcForm } from "@/lib/ipc/validation";
 import { createClient } from "@/lib/supabase/server";
+import { logSupabaseError } from "@/lib/supabase/errors";
 
-export async function previewIpcAction(
-  _previousState: IpcFormState,
-  formData: FormData,
-): Promise<IpcFormState> {
+export async function ipcAction(_previousState: IpcFormState, formData: FormData): Promise<IpcFormState> {
   await requireAdmin();
   const { errors, fields, payload } = validateIpcForm(formData);
-
-  if (!payload) {
-    return {
-      ...getEmptyIpcFormState(),
-      errors,
-      fields,
-      formError: "Revisa los campos marcados.",
-    };
+  const state = { ...getEmptyIpcFormState(), fields, errors };
+  if (!payload) return { ...state, formError: "Revisá los campos marcados." };
+  const schedule = formData.get("accion") === "programar";
+  if (schedule && formData.get("confirmar") !== "true") {
+    return { ...state, formError: "Confirmá la programación automática antes de continuar." };
   }
-
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc(
-    "previsualizar_actualizacion_ipc",
-    {
-      p_periodo: payload.periodo,
-      p_variacion_porcentual: payload.variacionPorcentual,
-    },
-  );
-
-  if (error) {
-    logSupabaseError("IPC previsualizar", error);
-    return getIpcRpcErrorState(fields, error);
-  }
-
-  const result = data[0];
-
-  if (!result) {
-    return {
-      ...getEmptyIpcFormState(),
-      fields,
-      formError: "No se pudo calcular el impacto del IPC.",
-    };
-  }
-
-  return {
-    ...getEmptyIpcFormState(),
-    fields,
-    summary: {
-      cantidadEventos: result.cantidad_eventos,
-      cantidadServicios: result.cantidad_servicios,
-      montoPrecioBaseAnterior: result.monto_precio_base_anterior,
-      montoPrecioBaseActualizado: result.monto_precio_base_proyectado,
-      montoTotalConIvaAnterior: result.monto_total_con_iva_anterior,
-      montoTotalConIvaActualizado: result.monto_total_con_iva_proyectado,
-    },
-  };
-}
-
-export async function applyIpcAction(
-  _previousState: IpcFormState,
-  formData: FormData,
-): Promise<IpcFormState> {
-  await requireAdmin();
-  const { errors, fields, payload } = validateIpcForm(formData);
-
-  if (!payload) {
-    return {
-      ...getEmptyIpcFormState(),
-      errors,
-      fields,
-      formError: "No se pudo confirmar el IPC. Revisa los datos.",
-    };
-  }
-
-  if (formData.get("confirmar") !== "true") {
-    return {
-      ...getEmptyIpcFormState(),
-      fields,
-      formError: "Confirma explícitamente la aplicación antes de continuar.",
-    };
-  }
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("registrar_y_aplicar_ipc", {
+  const args = {
     p_periodo: payload.periodo,
+    p_fecha_vigencia: payload.fechaVigencia,
     p_variacion_porcentual: payload.variacionPorcentual,
-  });
-
-  if (error) {
-    logSupabaseError("IPC aplicar", error);
-    return getIpcRpcErrorState(fields, error);
-  }
-
-  const result = data[0];
-
-  if (!result) {
-    return {
-      ...getEmptyIpcFormState(),
-      fields,
-      formError: "No se pudo confirmar la aplicación del IPC.",
+  };
+  const result = schedule
+    ? await supabase.rpc("programar_ipc", args)
+    : await supabase.rpc("previsualizar_ipc_programado", args).range(0, 499);
+  if (result.error) {
+    logSupabaseError("IPC programado", { code: result.error.code });
+    const messages: Record<string, string> = {
+      "23505": "El período ya fue aplicado o el índice registrado es distinto. Revisá el historial.",
+      "42501": "No tenés permisos para programar IPC.",
+      "22023": "Revisá el período, la variación y la fecha de vigencia.",
+      P0002: "Falta cargar el índice de ese período. Podés programarlo sin índice; quedará sin aplicar hasta cargarlo durante la vigencia.",
     };
+    return { ...state, formError: messages[result.error.code] ?? "No se pudo procesar el IPC. Intentá nuevamente." };
   }
-
-  revalidateIpcPaths();
-
-  return {
-    ...getEmptyIpcFormState(),
-    fields,
-    successMessage: "IPC aplicado correctamente.",
-    summary: mapAppliedSummary(result),
-  };
-}
-
-function mapAppliedSummary(result: {
-  cantidad_eventos: number;
-  cantidad_servicios: number;
-  monto_precio_base_actualizado: number;
-  monto_precio_base_anterior: number;
-  monto_total_con_iva_actualizado: number;
-  monto_total_con_iva_anterior: number;
-}): IpcSummary {
-  return {
-    cantidadEventos: result.cantidad_eventos,
-    cantidadServicios: result.cantidad_servicios,
-    montoPrecioBaseAnterior: result.monto_precio_base_anterior,
-    montoPrecioBaseActualizado: result.monto_precio_base_actualizado,
-    montoTotalConIvaAnterior: result.monto_total_con_iva_anterior,
-    montoTotalConIvaActualizado: result.monto_total_con_iva_actualizado,
-  };
-}
-
-function getIpcRpcErrorState(
-  fields: IpcFormState["fields"],
-  error: { code?: string | null },
-): IpcFormState {
-  const formError =
-    error.code === "23505"
-      ? "Ya existe un IPC registrado para ese período."
-      : error.code === "42501"
-        ? "No tenes permisos para aplicar IPC."
-        : "No se pudo procesar el IPC. Intenta nuevamente.";
-
-  return {
-    ...getEmptyIpcFormState(),
-    fields,
-    formError,
-  };
-}
-
-function revalidateIpcPaths() {
-  revalidatePath("/admin");
-  revalidatePath("/admin/actualizaciones-ipc");
-  revalidatePath("/admin/auditoria");
-  revalidatePath("/dashboard");
-  revalidatePath("/eventos");
-  revalidatePath("/eventos/[id]", "page");
-  revalidatePath("/reportes");
+  if (schedule) {
+    revalidatePath("/admin/actualizaciones-ipc");
+    revalidatePath("/admin/auditoria");
+    return { ...state, successMessage: "Programación guardada. La ejecución automática recalculará los saldos el día de vigencia en Argentina." };
+  }
+  const preview = result.data as NonNullable<IpcFormState["preview"]>;
+  for (let offset = preview.length; offset > 0 && offset % 500 === 0;) {
+    const page = await supabase.rpc("previsualizar_ipc_programado", args).range(offset, offset + 499);
+    if (page.error || !page.data) return { ...state, formError: "No se pudo leer la previsualización completa. Intentá nuevamente." };
+    preview.push(...page.data);
+    if (page.data.length < 500) break;
+    offset += page.data.length;
+  }
+  return { ...state, preview };
 }

@@ -170,6 +170,7 @@ function eventWorkbook(book: ExcelJS.Workbook, template: ExcelJS.Workbook, data:
     serviceRows.push(r);
     row(sheet, source, r++, 9, [service.servicios_catalogo?.nombre ?? "Servicio sin catálogo", service.precio_base,
       service.adicionales_monto, service.comisiona_organizador ? "Sí" : "No", service.proveedor, service.total_sin_iva, service.total_con_iva]);
+    if (service.ajuste_ipc) note(sheet, source, r++, `Ajuste IPC incluido en el total: ${money(service.ajuste_ipc)}. Cargo por importe, separado del IVA.`);
     if (service.notas) note(sheet, source, r++, service.notas);
   }
   if (!data.services.length) note(sheet, source, r++, "Sin servicios contratados guardados.");
@@ -184,7 +185,7 @@ function eventWorkbook(book: ExcelJS.Workbook, template: ExcelJS.Workbook, data:
   for (const service of data.services) {
     const amounts = serviceAmounts(service, payments);
     row(sheet, source, r, 28, [service.servicios_catalogo?.nombre ?? "Servicio sin catálogo", service.total_sin_iva,
-      service.iva_base_imponible, service.iva_porcentaje, roundMoney(numeric(service.total_con_iva) - numeric(service.total_sin_iva)), amounts.paid, amounts.balance]);
+      service.iva_base_imponible, service.iva_porcentaje, roundMoney(numeric(service.iva_base_imponible) * numeric(service.iva_porcentaje)), amounts.paid, amounts.balance]);
     sheet.getCell(r++, 4).numFmt = RATE;
     if (numeric(service.total_pagado) !== amounts.paid) note(sheet, source, r++, `Los cobros del detalle de ${service.servicios_catalogo?.nombre ?? "este servicio"} suman ${money(amounts.paid)}. El cobrado acreditado es ${money(numeric(service.total_pagado))}. Se exportan los cobros ordinarios del detalle.`);
     if (roundMoney(numeric(service.saldo_pendiente)) !== amounts.balance) {
@@ -302,6 +303,7 @@ function cateringWorkbook(book: ExcelJS.Workbook, template: ExcelJS.Workbook, da
   total(sheet, source, r++, "Total del catering — detalle", amounts.storedTotal, 8);
   book.definedNames.add(`'DC'!$H$${r}`, "SaldoCateringDetalle");
   total(sheet, source, r++, "Saldo pendiente — detalle", amounts.detailBalance, 8);
+  if (c.ajuste_ipc) total(sheet, source, r++, "Ajuste IPC incluido — cargo por importe, separado del IVA", c.ajuste_ipc, 8);
   total(sheet, source, r++, "Cobrado acreditado utilizado por el detalle", c.total_pagado, 8);
   total(sheet, source, r++, "Cobros ordinarios registrados", amounts.paid, 8);
   total(sheet, source, r++, "Garantías registradas — no reducen el saldo", amounts.guarantees, 8);
