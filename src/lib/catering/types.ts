@@ -1,4 +1,4 @@
-import type { Enums } from "@/types/database.types";
+import type { Enums } from "../../types/database.types";
 
 export type CateringAdicionalCategoria = Extract<
   Enums<"categoria_catering_item">,

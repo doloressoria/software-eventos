@@ -1,5 +1,7 @@
 import ExcelJS from "exceljs";
 import path from "node:path";
+import { nombreCategoria } from "../catering/coberturas";
+import { categoriasPax } from "../eventos/asistentes";
 import { cateringAmounts, ordinaryPayments, PARTIAL_NOTICE, paymentAmount, SEPARATE_NOTICE, serviceAmounts, uniquePayments } from "./calculations";
 import { getArgentinaPaymentDay, isChequePending, roundMoney, sumGuarantees, sumOrdinaryPayments, toMoneyNumber } from "../pagos/calculos";
 import { ExportError, type CateringExportData, type CommercialExportData, type EventExportData, type ExportContact, type ExportPayment } from "./types";
@@ -259,7 +261,7 @@ function cateringWorkbook(book: ExcelJS.Workbook, template: ExcelJS.Workbook, da
   for (let r = 1; r <= 18; r++) row(sheet, source, r, r, [], 17);
   for (const [address, label] of Object.entries({ A1: "Tipo de evento", A2: "Tipo de servicio", A3: "Cliente", A4: "Fecha", C4: "Adultos", D4: "Jóvenes", E4: "Menores", F4: "Bebés",
     A5: "PAX comida", A6: "PAX después del postre", A7: "PAX final", A8: "Salón / lugar", A9: "Organizador / agencia", A10: "Ejecutiva",
-    A11: "Razón social", A12: "Precio vigente por persona", A13: "Precio cierre alimentos sin IVA", A14: "Precio cierre bebidas sin IVA" })) cell(sheet, address, label);
+    A11: "Razón social", A12: "Precio general vigente sin IVA", A13: "Precio cierre alimentos sin IVA", A14: "Precio cierre bebidas sin IVA" })) cell(sheet, address, label);
   cell(sheet, "B1", e?.tipo_evento ?? c.tipo_evento); cell(sheet, "B2", c.tipo_servicio);
   cell(sheet, "B3", e?.cliente_nombre ?? c.cliente_nombre);
   cell(sheet, "B4", date(e?.fecha_evento ?? c.fecha_evento), DATE);
@@ -269,21 +271,31 @@ function cateringWorkbook(book: ExcelJS.Workbook, template: ExcelJS.Workbook, da
   cell(sheet, "B9", e?.organizador_nombre ?? "Sin dato disponible para esta descarga");
   cell(sheet, "B10", c.usuarios?.full_name ?? c.usuarios?.email ?? null); cell(sheet, "B11", e?.cliente_razon_social ?? c.cliente_razon_social);
   cell(sheet, "B12", amounts.unitPrice, MONEY); cell(sheet, "B13", c.precio_cierre_alimentos_sin_iva, MONEY); cell(sheet, "B14", c.precio_cierre_bebidas_sin_iva, MONEY);
-  note(sheet, source, 15, "El precio vigente es general. No se guarda un desglose histórico entre alimentos y bebidas ni una asignación de pagos a versiones de precios.", 8);
+  note(sheet, source, 15, "Los precios por categoría usan el precio general cuando no hay un valor específico. La cobertura conserva el precio aplicado al cobrar.", 8);
   cell(sheet, "C17", "Precio vigente");
   row(sheet, source, 18, 18, ["Concepto", "Descripción", "Precio unitario ARS", null, null, null, "PAX guardados", amounts.pax], 8);
   sheet.getCell("H18").numFmt = "0";
-  row(sheet, source, 19, 19, ["Precio general sin desglose", c.tipo_servicio, amounts.unitPrice, null, null, null, "Importe por PAX", amounts.paxSubtotal], 8);
+  row(sheet, source, 19, 19, ["Precio general de respaldo", c.tipo_servicio, amounts.unitPrice, null, null, null, "Importe base por PAX", amounts.paxSubtotal], 8);
   let r = 20;
+  if (data.tarifas.length > 0) {
+    row(sheet, source, r++, 18, ["Categoría", "PAX contratados", "Precio base sin IVA", "Adicional por persona sin IVA", "Precio aplicado con IVA", "Cubiertos", "PAX pendientes", "Saldo de PAX"], 8);
+    for (const [categoria, label] of categoriasPax) {
+      const tarifa = data.tarifas.find((t) => t.categoria === categoria);
+      if (!tarifa) continue;
+      row(sheet, source, r, 19, [label, tarifa.pax, tarifa.precio_base, tarifa.adicional_unitario, tarifa.precio_aplicado,
+        tarifa.cubiertos, tarifa.pendientes, tarifa.saldo_categoria], 8);
+      for (const col of [2, 6, 7]) sheet.getCell(r, col).numFmt = "0";
+      r++;
+    }
+  }
   const itemLabels: Record<string, string> = { alimentos: "Alimentos — ítem guardado", bebidas_alcoholicas: "Bebidas — ítem guardado", adicional_alimentos: "Adicional de alimentos", adicional_bebidas: "Adicional de bebidas", adicional_otros: "Adicional otros" };
   for (const item of data.items) {
-    const extra = item.categoria.startsWith("adicional_");
-    row(sheet, source, r++, 21, [itemLabels[item.categoria] ?? "Ítem sin clasificación", item.descripcion, item.precio_unitario, null, null, null,
-      extra ? "Importe adicional" : "Precio guardado", item.precio_unitario], 8);
+    const modo = item.categorias_pax ? `Por persona · ${item.categorias_pax.map(nombreCategoria).join(", ")}` : "Cargo fijo";
+    row(sheet, source, r++, 21, [itemLabels[item.categoria] ?? "Ítem sin clasificación", item.descripcion, item.precio_unitario, modo], 8);
   }
   if (!data.items.length) note(sheet, source, r++, "Sin adicionales guardados.", 8);
   r = Math.max(r + 1, 32);
-  total(sheet, source, r++, "Subtotal según precio vigente × PAX y precios de ítems", amounts.subtotal, 8);
+  total(sheet, source, r++, "Subtotal de PAX y adicionales", amounts.subtotal, 8);
   band(sheet, source, r++, "TOTALES DEL DETALLE COMERCIAL", 8);
   const officialTotalRow = r;
   book.definedNames.add(`'DC'!$H$${r}`, "TotalCateringDetalle");
@@ -295,14 +307,25 @@ function cateringWorkbook(book: ExcelJS.Workbook, template: ExcelJS.Workbook, da
   total(sheet, source, r++, "Garantías registradas — no reducen el saldo", amounts.guarantees, 8);
   if (amounts.difference !== 0) note(sheet, source, r++, `El total del detalle es ${money(amounts.storedTotal)} y el desglose según los datos actuales suma ${money(amounts.calculatedTotal)}. Diferencia: ${money(amounts.difference)}. Se mantiene el total del detalle.`, 8);
   if (amounts.storedPaid !== amounts.paid) note(sheet, source, r++, `El cobrado acreditado es ${money(amounts.storedPaid)} y los pagos ordinarios disponibles suman ${money(amounts.paid)}. El saldo del detalle utiliza el importe acreditado.`, 8);
-  if (amounts.detailBalance !== amounts.incomeBalance) note(sheet, source, r++, `El saldo del detalle es ${money(amounts.detailBalance)}. En la pantalla de ingresos, el saldo pendiente es ${money(amounts.incomeBalance)}, calculado con los cobros ordinarios y con mínimo cero.`, 8);
+  if (amounts.detailBalance !== amounts.incomeBalance) note(sheet, source, r++, `El saldo del detalle es ${money(amounts.detailBalance)}. En la pantalla de ingresos, el saldo pendiente es ${money(amounts.incomeBalance)}, con mínimo cero.`, 8);
   if (amounts.unitPrice === null) note(sheet, source, r++, "No hay un precio vigente por persona guardado. El total del detalle se conserva sin reconstruir precios.", 8);
   if (!data.eventAllowed) note(sheet, source, r++, `${PARTIAL_NOTICE} Los datos del evento vinculado no están incluidos.`, 8);
-  note(sheet, source, r++, "Los saldos negativos del detalle indican un importe a favor. No se asignaron PAX ni precios a los pagos.", 8);
+  note(sheet, source, r++, "Los saldos negativos del detalle indican un importe a favor.", 8);
   r = paymentBlock(sheet, source, r + 1, "PAGOS ORDINARIOS", ordinaryPayments(data.payments), undefined, 8);
   r = paymentBlock(sheet, source, r, "GARANTÍAS", uniquePayments(data.payments).filter((p) => p.es_garantia), undefined, 8);
   const pending = pendingCheques(data.payments);
   if (pending.length) r = paymentBlock(sheet, source, r, "CHEQUES PENDIENTES — NO APLICADOS AL SALDO", pending, undefined, 8);
+  if (data.coberturas.length > 0) {
+    band(sheet, source, r++, "COBERTURA HISTÓRICA POR PERSONAS", 8);
+    row(sheet, source, r++, 18, ["Categoría", "PAX del cobro", "Precio aplicado con IVA", "Importe original", "PAX reasignados", "Estado"], 8);
+    for (const linea of data.coberturas) {
+      const pago = data.payments.find((p) => (p.pago_id ?? p.id) === linea.pago_id);
+      row(sheet, source, r, 19, [nombreCategoria(linea.categoria), linea.cantidad, linea.precio_aplicado,
+        linea.importe_historico, linea.liberada, pago && isChequePending(pago) ? "Por acreditar" : "Acreditado"], 8);
+      for (const col of [2, 5]) sheet.getCell(r, col).numFmt = "0";
+      r++;
+    }
+  }
   band(sheet, source, r++, "COMISIÓN Y REVISIÓN DEL DESGLOSE ACTUAL", 8);
   for (const [label, value] of [["Comisión organizador", c.comision_organizador_monto], ["IVA de la comisión según tasa guardada", amounts.commissionVat],
     ["IVA del precio vigente y los ítems según tasa guardada", amounts.vat], ["Total según precios y adicionales actuales (incluye comisión e IVA)", amounts.calculatedTotal],
@@ -338,8 +361,12 @@ function cateringWorkbook(book: ExcelJS.Workbook, template: ExcelJS.Workbook, da
   let tr = 1;
   band(totals, source, tr++, "VALORES TOTALES POR SEPARADO", 8);
   tr++;
-  total(totals, source, tr++, "Precio general × PAX — sin desglose alimentos/bebidas", amounts.paxSubtotal, 8);
-  for (const category of ["alimentos", "bebidas_alcoholicas", "adicional_alimentos", "adicional_bebidas", "adicional_otros"]) total(totals, source, tr++, itemLabels[category], sum(data.items.filter((i) => i.categoria === category).map((i) => i.precio_unitario)), 8);
+  total(totals, source, tr++, "Precios base por categoría × PAX", amounts.paxSubtotal, 8);
+  const extras = data.costos.extras_por_tipo;
+  for (const category of ["alimentos", "bebidas_alcoholicas", "adicional_alimentos", "adicional_bebidas", "adicional_otros"]) {
+    const importe = extras && typeof extras === "object" && !Array.isArray(extras) ? extras[category] : null;
+    total(totals, source, tr++, itemLabels[category], typeof importe === "number" ? importe : 0, 8);
+  }
   total(totals, source, tr++, "Comisión organizador", amounts.commission, 8);
   total(totals, source, tr++, "IVA del desglose actual (catering y comisión)", roundMoney(amounts.vat + amounts.commissionVat), 8);
   total(totals, source, tr++, "Total según precios y adicionales actuales", amounts.calculatedTotal, 8);
@@ -350,16 +377,17 @@ function cateringWorkbook(book: ExcelJS.Workbook, template: ExcelJS.Workbook, da
   note(totals, source, tr++, amounts.unitPrice === null ? "No puede verificarse el desglose completo porque falta el precio vigente por persona. El total del detalle se conserva." : amounts.difference ? "El desglose no concilia con el total del detalle. La diferencia se informa por separado y no se distribuye entre conceptos." : "El desglose actual coincide con el total del detalle.", 8);
   finish(totals, tr, 8);
 
-  const history = sheetFromTemplate(book, source, "Historial de precios", 7);
-  [19, 24, 22, 14, 14, 14, 14].forEach((width, index) => { history.getColumn(index + 1).width = width; });
-  band(history, source, 1, "HISTORIAL REAL DE PRECIOS — SIN ASIGNACIÓN A PAGOS");
-  row(history, source, 2, 36, ["Fecha", "Motivo", "Precio por persona", "Adultos", "Jóvenes", "Menores", "Bebés"]);
+  const history = sheetFromTemplate(book, source, "Historial de precios", 11);
+  [19, 24, 22, 14, 14, 14, 14, 18, 18, 18, 18].forEach((width, index) => { history.getColumn(index + 1).width = width; });
+  band(history, source, 1, "HISTORIAL DE PRECIOS SIN IVA", 11);
+  row(history, source, 2, 36, ["Fecha", "Motivo", "Precio general", "PAX adultos", "PAX jóvenes", "PAX menores", "PAX bebés", "Precio adultos", "Precio jóvenes", "Precio menores", "Precio bebés"], 11);
   data.history.forEach((entry, index) => {
-    row(history, source, index + 3, 37, [date(entry.fecha), entry.motivo, entry.precio_unitario, entry.pax_adultos, entry.pax_jovenes, entry.pax_menores, entry.pax_bebes]);
+    row(history, source, index + 3, 37, [date(entry.fecha), entry.motivo, entry.precio_unitario, entry.pax_adultos, entry.pax_jovenes, entry.pax_menores, entry.pax_bebes,
+      entry.precio_adultos, entry.precio_jovenes, entry.precio_menores, entry.precio_bebes], 11);
     for (let col = 4; col <= 7; col++) history.getCell(index + 3, col).numFmt = "0";
   });
   if (!data.history.length) note(history, source, 3, "Sin precios históricos guardados.");
-  finish(history, Math.max(3, data.history.length + 2));
+  finish(history, Math.max(3, data.history.length + 2), 11);
 }
 
 export async function buildCommercialWorkbook(data: CommercialExportData) {

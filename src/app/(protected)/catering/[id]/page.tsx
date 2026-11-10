@@ -30,7 +30,7 @@ export default async function CateringDetallePage({
 }: CateringDetallePageProps) {
   const { id } = await params;
   const paramsQuery = searchParams ? await searchParams : {};
-  const [{ catering, items, precioHistorial, precioVigente }, { ejecutivas, lugares }] =
+  const [{ catering, items, totalAdicionales, precioHistorial, precioVigente }, { ejecutivas, lugares }] =
     await Promise.all([getCateringById(id), getNuevoCateringPageData()]);
   const display = getCateringDisplayFields(catering);
   const contactos = catering.evento_id ? await getEventoContactos(catering.evento_id) : null;
@@ -161,7 +161,7 @@ export default async function CateringDetallePage({
         }}
       />
 
-      <CateringItemsSection cateringId={catering.id} items={items} />
+      <CateringItemsSection cateringId={catering.id} items={items} total={totalAdicionales} />
 
       <Card>
         <CardHeader>

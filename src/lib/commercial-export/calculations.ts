@@ -1,4 +1,5 @@
-import { calculatePaymentSummary, getMoneyAmount, isOrdinaryPayment, roundMoney, sumGuarantees, sumOrdinaryPayments, toMoneyNumber } from "../pagos/calculos";
+import { getMoneyAmount, isOrdinaryPayment, roundMoney, sumGuarantees, sumOrdinaryPayments, toMoneyNumber } from "../pagos/calculos";
+import { totalInvitados } from "../eventos/asistentes";
 import type { CateringExportData, ExportPayment, ExportService } from "./types";
 
 export const PARTIAL_NOTICE = "Resumen parcial: incluye únicamente información autorizada.";
@@ -22,28 +23,30 @@ export function serviceAmounts(service: ExportService, payments: ExportPayment[]
     balance: roundMoney(toMoneyNumber(service.total_con_iva) - paid), guarantees: sumGuarantees(own) };
 }
 
-// Diagnostic only: mirrors the transactional catering formula without executing writes.
 export function cateringAmounts(data: CateringExportData) {
-  const { catering: c, history, items } = data;
+  const { catering: c, history, costos } = data;
   const payments = uniquePayments(data.payments);
-  const pax = [c.pax_adultos, c.pax_jovenes, c.pax_menores, c.pax_bebes].reduce<number>((sum, n) => sum + toMoneyNumber(n), 0);
-  const unitPrice = history[0]?.precio_unitario ?? null;
-  const paxSubtotal = roundMoney(toMoneyNumber(unitPrice) * pax);
-  const extras = roundMoney(items.reduce((sum, item) => sum + toMoneyNumber(item.precio_unitario), 0));
-  const subtotal = roundMoney(paxSubtotal + extras);
-  const commission = toMoneyNumber(c.comision_organizador_monto);
-  const vat = roundMoney(subtotal * toMoneyNumber(c.iva_porcentaje));
-  const commissionVat = roundMoney(commission * toMoneyNumber(c.iva_comision));
-  const calculatedNet = roundMoney(subtotal + commission);
-  const calculatedTotal = roundMoney(subtotal + vat + commission + commissionVat);
   const storedTotal = toMoneyNumber(c.total_con_iva);
-  const paid = sumOrdinaryPayments(payments);
-  const summary = calculatePaymentSummary({ payments, total: storedTotal });
-  return { pax, unitPrice, paxSubtotal, extras, subtotal, commission, vat, commissionVat,
-    calculatedNet, calculatedTotal, storedTotal, paid,
-    storedPaid: toMoneyNumber(c.total_pagado), detailBalance: toMoneyNumber(c.saldo_pendiente),
-    incomeBalance: summary.saldoPendiente, guarantees: sumGuarantees(payments),
-    difference: roundMoney(storedTotal - calculatedTotal) };
+  const detailBalance = toMoneyNumber(c.saldo_pendiente);
+  const calculatedTotal = toMoneyNumber(costos.total_con_iva);
+  return {
+    pax: totalInvitados(c),
+    unitPrice: history[0]?.precio_unitario ?? null,
+    paxSubtotal: toMoneyNumber(costos.pax_subtotal),
+    extras: toMoneyNumber(costos.extras),
+    subtotal: toMoneyNumber(costos.subtotal),
+    commission: toMoneyNumber(c.comision_organizador_monto),
+    vat: toMoneyNumber(costos.iva),
+    commissionVat: toMoneyNumber(costos.iva_comision),
+    calculatedTotal,
+    storedTotal,
+    paid: sumOrdinaryPayments(payments),
+    storedPaid: toMoneyNumber(c.total_pagado),
+    detailBalance,
+    incomeBalance: Math.max(detailBalance, 0),
+    guarantees: sumGuarantees(payments),
+    difference: roundMoney(storedTotal - calculatedTotal),
+  };
 }
 
 export function paymentAmount(payment: ExportPayment) { return getMoneyAmount(payment); }

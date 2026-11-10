@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useId } from "react";
 import { useExportForm } from "@/components/commercial-export";
 import {
   addCateringItemAction,
@@ -38,20 +38,22 @@ import {
   type CateringAdicionalCategoria,
 } from "@/lib/catering/types";
 import { getEmptyCateringItemFormState } from "@/lib/catering/item-validation";
+import { categoriasPax } from "@/lib/eventos/asistentes";
 import type { CateringItemRow } from "@/lib/catering/queries";
 
 type CateringItemsSectionProps = {
   cateringId: string;
   items: CateringItemRow[];
+  total: number;
 };
 
-export function CateringItemsSection({ cateringId, items }: CateringItemsSectionProps) {
+export function CateringItemsSection({ cateringId, items, total }: CateringItemsSectionProps) {
   const [state, formAction, pending] = useActionState(
     addCateringItemAction.bind(null, cateringId),
     getEmptyCateringItemFormState(),
   );
   const formRef = useRef<HTMLFormElement>(null);
-  const total = items.reduce((sum, item) => sum + (item.precio_unitario ?? 0), 0);
+  const id = useId();
 
   useEffect(() => {
     if (state.successMessage) {
@@ -66,7 +68,7 @@ export function CateringItemsSection({ cateringId, items }: CateringItemsSection
         <div>
           <CardTitle>Adicionales</CardTitle>
           <CardDescription>
-            Alimentos, bebidas alcoholicas y otros adicionales fuera del precio por persona.
+            Cargos fijos y adicionales que se suman al precio por persona de las categorías elegidas.
           </CardDescription>
         </div>
         <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-4 py-3 text-right">
@@ -86,6 +88,7 @@ export function CateringItemsSection({ cateringId, items }: CateringItemsSection
                 <TableRow>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Detalle</TableHead>
+                  <TableHead>Cobro</TableHead>
                   <TableHead className="text-right">Precio</TableHead>
                   <TableHead className="text-right">Accion</TableHead>
                 </TableRow>
@@ -101,6 +104,8 @@ export function CateringItemsSection({ cateringId, items }: CateringItemsSection
                     <TableCell className="font-medium text-slate-950">
                       {item.descripcion}
                     </TableCell>
+                    <TableCell>{item.categorias_pax === null ? "Fijo" :
+                      categoriasPax.filter(([categoria]) => item.categorias_pax?.includes(categoria)).map(([, label]) => label).join(", ")}</TableCell>
                     <TableCell className="text-right text-slate-950">
                       {formatCurrency(item.precio_unitario ?? 0)}
                     </TableCell>
@@ -181,6 +186,25 @@ export function CateringItemsSection({ cateringId, items }: CateringItemsSection
                 ) : null}
               </div>
             </div>
+
+            <fieldset className="space-y-3">
+              <legend className="mb-2 text-sm font-medium">Cómo se cobra</legend>
+              <div className="flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 text-sm"><input type="radio" name="modo" value="fijo" defaultChecked={state.fields.modo === "fijo"} /> Cargo fijo</label>
+                <label className="flex items-center gap-2 text-sm"><input type="radio" name="modo" value="persona" defaultChecked={state.fields.modo === "persona"} /> Por persona</label>
+              </div>
+              {state.errors.modo && <FieldError id={`${id}-modo-error`}>{state.errors.modo}</FieldError>}
+              <p className="text-sm text-slate-600">Para un cargo por persona, elegí las categorías a las que aplica.</p>
+              <div className="flex flex-wrap gap-4" role="group" aria-label="Categorías del adicional por persona"
+                aria-describedby={state.errors.categorias_pax ? `${id}-categorias-error` : undefined}>
+                {categoriasPax.map(([categoria, label]) => (
+                  <label key={categoria} className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="categorias_pax" value={categoria} defaultChecked={state.fields.categorias_pax.includes(categoria)} /> {label}
+                  </label>
+                ))}
+              </div>
+              {state.errors.categorias_pax && <FieldError id={`${id}-categorias-error`}>{state.errors.categorias_pax}</FieldError>}
+            </fieldset>
 
             {state.formError ? <FormAlert>{state.formError}</FormAlert> : null}
             {state.successMessage ? (

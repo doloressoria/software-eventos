@@ -10,6 +10,8 @@ import {
   validateImputaciones,
   validatePagoForm,
 } from "@/lib/pagos/validation";
+import { guardarCobertura } from "@/lib/catering/guardar-cobertura";
+import { cantidadPax } from "@/lib/catering/coberturas";
 import { createClient } from "@/lib/supabase/server";
 import { logSupabaseError } from "@/lib/supabase/errors";
 
@@ -61,6 +63,11 @@ async function savePago(eventoId: string, pagoId: string | null, formData: FormD
   }
 
   const id = pagoId ?? requestId;
+  if (!pagoId && formData.get("modo_pago") === "personas") {
+    const result = await guardarCobertura(formData, state, payload, { eventoId });
+    if (result.successMessage) revalidateEventoPaths(eventoId);
+    return result;
+  }
   if (!lines || !id) {
     return { ...state, formError: "Elegí destinos distintos y distribuí el equivalente en ARS al centavo." };
   }
@@ -108,6 +115,30 @@ async function savePago(eventoId: string, pagoId: string | null, formData: FormD
     ...(pagoId ? state : { ...getEmptyPagoFormState(), solicitudConfirmada: id }),
     successMessage: pagoId ? "Pago actualizado correctamente." : "Pago registrado correctamente.",
   };
+}
+
+export async function reasignarExcedenteAction(
+  eventoId: string, pagoId: string, cateringId: string, categoria: string, liberada: number,
+  _state: DeletePagoState, formData: FormData,
+): Promise<DeletePagoState> {
+  const profile = await getCurrentProfile();
+  if (!profile?.activo || !await getAuthorizedActiveEvento(eventoId, profile)) return { formError: "Reasignación no autorizada." };
+  const cantidad = cantidadPax(String(formData.get("cantidad") ?? ""));
+  const [tipo, destino, extra] = String(formData.get("destino") ?? "").split(":");
+  if (!cantidad || extra !== undefined || !destino || (tipo !== "servicio" && tipo !== "catering")) {
+    return { formError: "Ingresá la cantidad y elegí el destino del excedente." };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("reasignar_excedente_catering", {
+    p_catering: cateringId, p_pago: pagoId, p_categoria: categoria, p_cantidad: cantidad,
+    p_destino: destino, p_es_catering: tipo === "catering", p_liberada_esperada: liberada,
+  });
+  if (error) {
+    logSupabaseError("reasignar excedente de catering", { code: error.code });
+    return { formError: "No se pudo reasignar. Revisá el excedente, los destinos, las tarifas históricas y tus permisos." };
+  }
+  revalidateEventoPaths(eventoId);
+  return {};
 }
 
 export async function deletePagoAction(

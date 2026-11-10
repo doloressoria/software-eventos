@@ -12,7 +12,7 @@ test("servicios reflejan el saldo visible y excluyen garantías, bajas y otros d
   assert.throws(() => uniquePayments([paid, { ...paid, importe_en_pesos: 999 }]), /contradictorios/);
 });
 
-test("detalle, ingresos y diagnóstico mantienen sus fuentes aun con discrepancias y sobrepagos", () => {
+test("detalle e ingresos usan el mismo saldo SQL aunque difieran los movimientos visibles", () => {
   const data = exampleCatering({ mismatch: true });
   data.catering.total_pagado = 20;
   data.catering.saldo_pendiente = data.catering.total_con_iva! - 20;
@@ -23,6 +23,6 @@ test("detalle, ingresos y diagnóstico mantienen sus fuentes aun con discrepanci
   assert.equal(a.storedPaid, 20);
   assert.notEqual(a.storedPaid, a.paid);
   assert.equal(a.detailBalance, 2227.75);
-  assert.equal(a.incomeBalance, 0);
+  assert.equal(a.incomeBalance, 2227.75);
   assert.ok(a.paid > a.storedTotal);
 });

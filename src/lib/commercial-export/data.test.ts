@@ -17,6 +17,7 @@ function database({ screens = ["eventos", "catering"], active = true, authentica
     usuarios: [{ id: fixtureId(99), rol: "vendedor", activo: active }], eventos: [event.event],
     v_evento_servicios_acreditados: event.services, v_pago_imputaciones: [...event.payments, ...catering.payments.map((p) => ({ ...p, id: `contract-${p.id}` }))],
     v_catering_acreditado: [catering.catering], catering_items: catering.items, catering_precio_historial: catering.history,
+    v_catering_costos: [catering.costos], v_catering_tarifas: catering.tarifas, catering_coberturas: catering.coberturas,
     evento_contactos: event.contacts.map((c) => ({ ...c, evento_id: event.event.id, deleted_at: null })), actualizaciones_ipc: event.updates,
   };
   const client = {

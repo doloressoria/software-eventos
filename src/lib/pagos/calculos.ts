@@ -124,16 +124,18 @@ export function sumGuarantees(payments: PaymentMoneyRow[]) {
 export function calculatePaymentSummary({
   payments,
   total,
+  saldo,
 }: {
   payments: PaymentMoneyRow[];
   total: number;
+  saldo?: number;
 }) {
   const totalCobrado = sumOrdinaryPayments(payments);
   const totalEvento = roundMoney(Math.max(toMoneyNumber(total), 0));
-  const saldoPendiente = Math.max(roundMoney(totalEvento - totalCobrado), 0);
+  const saldoPendiente = Math.max(roundMoney(saldo ?? (totalEvento - totalCobrado)), 0);
 
   return {
-    estadoCobro: getEstadoCobro({ totalCobrado, totalEvento }),
+    estadoCobro: getEstadoCobro({ totalCobrado, totalEvento, saldoPendiente }),
     garantiasRegistradas: sumGuarantees(payments),
     saldoPendiente,
     totalCobrado,
@@ -169,13 +171,15 @@ export function toMoneyNumber(value: number | null | undefined) {
 function getEstadoCobro({
   totalCobrado,
   totalEvento,
+  saldoPendiente,
 }: {
   totalCobrado: number;
   totalEvento: number;
+  saldoPendiente: number;
 }): EstadoCobro {
   if (totalCobrado === 0 || totalEvento === 0) {
     return "pendiente";
   }
 
-  return totalCobrado < totalEvento ? "parcial" : "pagado";
+  return saldoPendiente > 0 ? "parcial" : "pagado";
 }

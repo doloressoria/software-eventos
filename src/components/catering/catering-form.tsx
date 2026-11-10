@@ -1,5 +1,7 @@
 "use client";
 
+import { PreciosCategoriaFields } from "@/components/catering/precios-categoria-fields";
+
 import Link from "next/link";
 import { useActionState, useRef, useState } from "react";
 import { useExportForm } from "@/components/commercial-export";
@@ -366,7 +368,7 @@ export function CateringForm({
           <CardContent>
             <div className="grid gap-5 sm:grid-cols-2">
               <div>
-                <Label htmlFor="precio_unitario_inicial">Precio por persona</Label>
+                <Label htmlFor="precio_unitario_inicial">Precio general por persona sin IVA</Label>
                 <Input
                   id="precio_unitario_inicial"
                   name="precio_unitario_inicial"
@@ -393,6 +395,7 @@ export function CateringForm({
                 label="Motivo / detalle"
                 defaultValue={state.fields.precio_motivo_inicial}
               />
+              <PreciosCategoriaFields fields={state.fields} errors={state.errors} prefix="inicial" />
             </div>
           </CardContent>
         </Card>

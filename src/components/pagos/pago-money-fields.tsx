@@ -6,8 +6,9 @@ import { FieldError, Input, Label } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { pagoFormaPagoOptions, paymentEquivalent, type PagoFormState } from "@/lib/pagos/validation";
 
-export function PagoMoneyFields({ state, children }: {
+export function PagoMoneyFields({ state, children, coberturaTotal }: {
   state: PagoFormState;
+  coberturaTotal?: number;
   children?: (equivalent: number | null) => ReactNode;
 }) {
   const id = useId();
@@ -16,7 +17,10 @@ export function PagoMoneyFields({ state, children }: {
   const [monto, setMonto] = useState(state.fields.monto);
   const [cotizacion, setCotizacion] = useState(state.fields.moneda === "USD" ? state.fields.tipo_cambio : "");
   const rate = moneda === "ARS" ? "1" : cotizacion;
-  const equivalent = paymentEquivalent(monto, rate);
+  const porPersonas = coberturaTotal !== undefined;
+  const importePorPersonas = porPersonas && moneda === "ARS";
+  const importe = importePorPersonas ? (coberturaTotal > 0 ? coberturaTotal.toFixed(2) : "") : monto;
+  const equivalent = paymentEquivalent(importe, rate);
   const changeCurrency = (value: string) => {
     setMoneda(value);
     if (forma.startsWith("efectivo_")) setForma(value === "USD" ? "efectivo_dolares" : "efectivo_pesos");
@@ -57,7 +61,7 @@ export function PagoMoneyFields({ state, children }: {
     </div>
     <div>
       <Label htmlFor={`${id}-monto`}>Importe original ({moneda})</Label>
-      <Input id={`${id}-monto`} name="monto" type="number" min="0.01" step="0.01" required value={monto} onChange={e => setMonto(e.target.value)} aria-invalid={Boolean(state.errors.monto)} aria-describedby={state.errors.monto ? `${id}-monto-error` : undefined} />
+      <Input id={`${id}-monto`} name="monto" type="number" min="0.01" step="0.01" required value={importe} readOnly={importePorPersonas} onChange={e => setMonto(e.target.value)} aria-invalid={Boolean(state.errors.monto)} aria-describedby={state.errors.monto ? `${id}-monto-error` : undefined} />
       {state.errors.monto && <FieldError id={`${id}-monto-error`}>{state.errors.monto}</FieldError>}
     </div>
     <div>
@@ -76,10 +80,10 @@ export function PagoMoneyFields({ state, children }: {
       <Label htmlFor={`${id}-cheque`}>Número de cheque (si corresponde)</Label>
       <Input id={`${id}-cheque`} name="numero_cheque" defaultValue={state.fields.numero_cheque} />
     </div>
-    <div className="md:col-span-2">
+    {!porPersonas && <div className="md:col-span-2">
       <label htmlFor={`${id}-garantia`} className="flex items-center gap-2 text-sm"><input id={`${id}-garantia`} type="checkbox" name="es_garantia" aria-invalid={Boolean(state.errors.es_garantia)} aria-describedby={state.errors.es_garantia ? `${id}-garantia-error` : undefined} defaultChecked={state.fields.es_garantia === "on"} /> Garantía (no reduce deuda ni cuenta como cobro)</label>
       {state.errors.es_garantia && <FieldError id={`${id}-garantia-error`}>{state.errors.es_garantia}</FieldError>}
-    </div>
+    </div>}
     {children?.(equivalent)}
   </>;
 }

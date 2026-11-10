@@ -1,6 +1,7 @@
+import { camposPreciosCategoria, validarPreciosCategoria } from "./precios-categoria";
 import { getTodayInputValue } from "@/lib/catering/validation";
 
-export type PrecioHistorialFormFields = {
+export type PrecioHistorialFormFields = ReturnType<typeof camposPreciosCategoria> & {
   precio_unitario: string;
   motivo: string;
   fecha: string;
@@ -21,7 +22,7 @@ export type PrecioHistorialFormState = {
   successMessage: string | null;
 };
 
-export type PrecioHistorialPayload = {
+export type PrecioHistorialPayload = ReturnType<typeof validarPreciosCategoria> & {
   precio_unitario: number;
   motivo: string | null;
   fecha: string;
@@ -39,6 +40,7 @@ export function getEmptyPrecioHistorialFormState(defaults: {
 }): PrecioHistorialFormState {
   return {
     fields: {
+      ...camposPreciosCategoria({}),
       precio_unitario: "",
       motivo: "Recotizacion",
       fecha: getTodayInputValue(),
@@ -86,6 +88,8 @@ export function validatePrecioHistorialForm(formData: FormData): {
   const paxMenores = parseOptionalInteger(fields.pax_menores, "pax_menores", errors);
   const paxBebes = parseOptionalInteger(fields.pax_bebes, "pax_bebes", errors);
 
+  const preciosCategoria = validarPreciosCategoria(fields, errors);
+
   if (Object.keys(errors).length > 0 || precio === null) {
     return {
       state: {
@@ -101,6 +105,7 @@ export function validatePrecioHistorialForm(formData: FormData): {
   return {
     state: { fields, errors: {}, formError: null, successMessage: null },
     payload: {
+      ...preciosCategoria,
       precio_unitario: precio,
       motivo: nullableTrim(fields.motivo),
       fecha,
@@ -114,6 +119,7 @@ export function validatePrecioHistorialForm(formData: FormData): {
 
 function getFields(formData: FormData): PrecioHistorialFormFields {
   return {
+    ...camposPreciosCategoria(formData),
     precio_unitario: getString(formData, "precio_unitario"),
     motivo: getString(formData, "motivo"),
     fecha: getString(formData, "fecha"),

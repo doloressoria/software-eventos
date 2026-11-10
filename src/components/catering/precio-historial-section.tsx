@@ -1,5 +1,9 @@
 "use client";
 
+import { PreciosCategoriaFields } from "@/components/catering/precios-categoria-fields";
+import { camposPreciosCategoria } from "@/lib/catering/precios-categoria";
+import { categoriasPax } from "@/lib/eventos/asistentes";
+
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useExportForm } from "@/components/commercial-export";
 import { addPrecioHistorialAction } from "@/app/(protected)/catering/actions";
@@ -71,7 +75,7 @@ export function PrecioHistorialSection({
                 <TableRow>
                   <TableHead>Fecha</TableHead>
                   <TableHead>Motivo</TableHead>
-                  <TableHead className="text-right">Precio x persona</TableHead>
+                  <TableHead className="text-right">Precios por persona sin IVA</TableHead>
                   <TableHead className="text-right">PAX</TableHead>
                   <TableHead>Cargado por</TableHead>
                 </TableRow>
@@ -89,7 +93,11 @@ export function PrecioHistorialSection({
                     </TableCell>
                     <TableCell className="text-slate-600">{entry.motivo ?? "-"}</TableCell>
                     <TableCell className="text-right font-medium text-slate-950">
-                      {formatCurrency(entry.precio_unitario)}
+                      <div>General · {formatCurrency(entry.precio_unitario)}</div>
+                      {categoriasPax.map(([categoria, label]) => {
+                        const precio = entry[`precio_${categoria}`];
+                        return precio === null ? null : <div key={categoria}>{label} · {formatCurrency(precio)}</div>;
+                      })}
                     </TableCell>
                     <TableCell className="text-right text-slate-600">
                       {sumPax(entry)}
@@ -114,7 +122,7 @@ export function PrecioHistorialSection({
           <form ref={formRef} action={formAction} className="mt-4 space-y-5" noValidate>
             <div className="grid gap-5 sm:grid-cols-2">
               <div>
-                <Label htmlFor="historial-precio_unitario">Nuevo precio por persona</Label>
+                <Label htmlFor="historial-precio_unitario">Precio general por persona sin IVA</Label>
                 <Input
                   id="historial-precio_unitario"
                   name="precio_unitario"
@@ -149,6 +157,8 @@ export function PrecioHistorialSection({
                   <FieldError id="fecha-error">{state.errors.fecha}</FieldError>
                 ) : null}
               </div>
+              <PreciosCategoriaFields key={historial[0]?.id} prefix="historial" errors={state.errors}
+                fields={state.formError ? state.fields : camposPreciosCategoria(historial[0] ?? {})} />
               <div className="sm:col-span-2">
                 <Label htmlFor="motivo">Motivo / detalle</Label>
                 <Input

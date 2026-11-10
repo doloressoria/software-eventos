@@ -13,7 +13,8 @@ const usd = process.argv.includes("--usd");
 const contactos = process.argv.includes("--contactos");
 const balances = process.argv.includes("--balances");
 const catering = process.argv.includes("--catering");
-const imputaciones = process.argv.includes("--imputaciones");
+const cobertura = process.argv.includes("--cobertura");
+const imputaciones = cobertura || process.argv.includes("--imputaciones");
 const cheques = process.argv.includes("--cheques");
 const expenses = process.argv.includes("--expenses");
 try {
@@ -42,6 +43,13 @@ try {
       ] : []),
       readFileSync("supabase/tests/cheques.sql", "utf8"),
       ...(imputaciones ? [readFileSync("supabase/tests/imputaciones.sql", "utf8")] : []),
+      ...(cobertura ? [
+        readFileSync("supabase/verification/preflight-catering-por-personas.sql", "utf8"),
+        readFileSync("supabase/migrations/20261110215027_catering_por_personas.sql", "utf8")
+          .replace(/^begin;\n|\ncommit;\n$/g, ""),
+        readFileSync("supabase/tests/catering-cobertura.sql", "utf8"),
+        readFileSync("supabase/verification/postflight-catering-por-personas.sql", "utf8"),
+      ] : []),
       "rollback;",
     ] : catering ? [
       readFileSync("supabase/migrations/20261021145259_unblock_payments_and_summary_access.sql", "utf8"),

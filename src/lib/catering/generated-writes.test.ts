@@ -24,6 +24,7 @@ function loadModule(path: string, dependencies: Record<string, unknown>) {
 test("alta de adicional usa pax=1 y deja total generado a PostgreSQL", async () => {
   let inserted: Record<string, unknown> | undefined;
   const loaded = loadModule("src/app/(protected)/catering/actions.ts", {
+    "@/lib/catering/guardar-cobertura": {},
     "next/cache": { revalidatePath() {} },
     "next/navigation": {},
     "@/lib/auth": { getCurrentProfile: async () => ({ id: "user", activo: true }) },
@@ -63,7 +64,8 @@ test("alta usa una RPC atómica; un error conserva borrador sin anunciar éxito"
     const state = { fields: { cliente_nombre: "LAB", precio_unitario_inicial: "100" } };
     let calls = 0;
     const loaded = loadModule("src/app/(protected)/catering/actions.ts", {
-      "next/cache": { revalidatePath() { assert.equal(failure, false); } },
+      "@/lib/catering/guardar-cobertura": {},
+    "next/cache": { revalidatePath() { assert.equal(failure, false); } },
       "next/navigation": { redirect(path: string) { throw new Error(path); } },
       "@/lib/auth": { getCurrentProfile: async () => ({ id: "user", activo: true }) },
       "@/lib/catering/validation": { validateCateringForm: () => ({ state, payload: {
@@ -102,7 +104,8 @@ test("recotización realiza una escritura; el trigger guarda PAX y total o revie
     let writes = 0;
     const state = { fields: { precio_unitario: "110" }, errors: {} };
     const loaded = loadModule("src/app/(protected)/catering/actions.ts", {
-      "next/cache": { revalidatePath() { assert.equal(failure, false); } }, "next/navigation": {},
+      "@/lib/catering/guardar-cobertura": {},
+    "next/cache": { revalidatePath() { assert.equal(failure, false); } }, "next/navigation": {},
       "@/lib/auth": { getCurrentProfile: async () => ({ id: "user", activo: true }) },
       "@/lib/catering/validation": {},
       "@/lib/catering/precio-historial-validation": { validatePrecioHistorialForm: () => ({

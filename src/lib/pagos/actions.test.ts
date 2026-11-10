@@ -35,6 +35,8 @@ function setup(catering: boolean, options: { denied?: boolean; failure?: boolean
     "next/cache": { revalidatePath: (path: string) => invalidations.push(path) },
     "next/navigation": { redirect() { throw new Error("redirect"); } },
     "@/lib/auth": { getCurrentProfile: async () => ({ id: "actor", activo: true }), getAuthorizedActiveEvento: async () => options.denied ? null : { id: "event" } },
+    "@/lib/catering/guardar-cobertura": {},
+    "@/lib/catering/coberturas": {},
     "@/lib/pagos/validation": validation,
     "@/lib/pagos/calculos": calculos,
     "@/lib/roles/access": { requireScreenManagement: async () => {} },

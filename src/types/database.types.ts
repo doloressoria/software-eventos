@@ -127,6 +127,72 @@ export type Database = {
           },
         ]
       }
+      catering_coberturas: {
+        Row: {
+          cantidad: number
+          categoria: string
+          catering_contrato_id: string
+          importe_historico: number | null
+          liberada: number
+          pago_id: string
+          precio_aplicado: number
+        }
+        Insert: {
+          cantidad: number
+          categoria: string
+          catering_contrato_id: string
+          importe_historico?: never
+          liberada?: number
+          pago_id: string
+          precio_aplicado: number
+        }
+        Update: {
+          cantidad?: number
+          categoria?: string
+          catering_contrato_id?: string
+          importe_historico?: never
+          liberada?: number
+          pago_id?: string
+          precio_aplicado?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catering_coberturas_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "catering_contratos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catering_coberturas_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "v_catering_acreditado"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catering_coberturas_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "v_catering_costos"
+            referencedColumns: ["catering_contrato_id"]
+          },
+          {
+            foreignKeyName: "catering_coberturas_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "v_catering_tarifas"
+            referencedColumns: ["catering_contrato_id"]
+          },
+          {
+            foreignKeyName: "catering_coberturas_pago_id_fkey"
+            columns: ["pago_id"]
+            isOneToOne: false
+            referencedRelation: "pagos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       catering_contratos: {
         Row: {
           cliente_contacto: string | null
@@ -295,6 +361,7 @@ export type Database = {
       catering_items: {
         Row: {
           categoria: Database["public"]["Enums"]["categoria_catering_item"]
+          categorias_pax: string[] | null
           catering_contrato_id: string
           created_at: string
           descripcion: string
@@ -307,6 +374,7 @@ export type Database = {
         }
         Insert: {
           categoria: Database["public"]["Enums"]["categoria_catering_item"]
+          categorias_pax?: string[] | null
           catering_contrato_id: string
           created_at?: string
           descripcion: string
@@ -319,6 +387,7 @@ export type Database = {
         }
         Update: {
           categoria?: Database["public"]["Enums"]["categoria_catering_item"]
+          categorias_pax?: string[] | null
           catering_contrato_id?: string
           created_at?: string
           descripcion?: string
@@ -336,6 +405,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "catering_contratos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catering_items_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "v_catering_acreditado"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catering_items_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "v_catering_costos"
+            referencedColumns: ["catering_contrato_id"]
+          },
+          {
+            foreignKeyName: "catering_items_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "v_catering_tarifas"
+            referencedColumns: ["catering_contrato_id"]
           },
         ]
       }
@@ -398,6 +488,10 @@ export type Database = {
           pax_bebes: number | null
           pax_jovenes: number | null
           pax_menores: number | null
+          precio_adultos: number | null
+          precio_bebes: number | null
+          precio_jovenes: number | null
+          precio_menores: number | null
           precio_unitario: number
           usuario_id: string
         }
@@ -411,6 +505,10 @@ export type Database = {
           pax_bebes?: number | null
           pax_jovenes?: number | null
           pax_menores?: number | null
+          precio_adultos?: number | null
+          precio_bebes?: number | null
+          precio_jovenes?: number | null
+          precio_menores?: number | null
           precio_unitario: number
           usuario_id?: string
         }
@@ -424,6 +522,10 @@ export type Database = {
           pax_bebes?: number | null
           pax_jovenes?: number | null
           pax_menores?: number | null
+          precio_adultos?: number | null
+          precio_bebes?: number | null
+          precio_jovenes?: number | null
+          precio_menores?: number | null
           precio_unitario?: number
           usuario_id?: string
         }
@@ -434,6 +536,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "catering_contratos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catering_precio_historial_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "v_catering_acreditado"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catering_precio_historial_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "v_catering_costos"
+            referencedColumns: ["catering_contrato_id"]
+          },
+          {
+            foreignKeyName: "catering_precio_historial_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "v_catering_tarifas"
+            referencedColumns: ["catering_contrato_id"]
           },
           {
             foreignKeyName: "catering_precio_historial_usuario_id_fkey"
@@ -512,6 +635,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "catering_contratos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "egresos_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "v_catering_costos"
+            referencedColumns: ["catering_contrato_id"]
+          },
+          {
+            foreignKeyName: "egresos_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "v_catering_tarifas"
+            referencedColumns: ["catering_contrato_id"]
           },
           {
             foreignKeyName: "egresos_evento_id_fkey"
@@ -961,6 +1098,20 @@ export type Database = {
             referencedRelation: "pagos"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "pago_imputaciones_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "v_catering_costos"
+            referencedColumns: ["catering_contrato_id"]
+          },
+          {
+            foreignKeyName: "pago_imputaciones_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "v_catering_tarifas"
+            referencedColumns: ["catering_contrato_id"]
+          },
         ]
       }
       pagos: {
@@ -1072,6 +1223,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "usuarios"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pagos_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "v_catering_costos"
+            referencedColumns: ["catering_contrato_id"]
+          },
+          {
+            foreignKeyName: "pagos_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "v_catering_tarifas"
+            referencedColumns: ["catering_contrato_id"]
           },
         ]
       }
@@ -1369,6 +1534,7 @@ export type Database = {
       }
       v_catering_acreditado: {
         Row: {
+          ajuste_cobertura: number | null
           cliente_contacto: string | null
           cliente_cuit_dni: string | null
           cliente_nombre: string | null
@@ -1405,12 +1571,12 @@ export type Database = {
           salon_id: string | null
           tipo_evento: string | null
           tipo_servicio: string | null
+          total_adicionales: number | null
           total_con_iva: number | null
           total_pagado: number | null
           total_sin_iva: number | null
           updated_at: string | null
         }
-        ComputedFields: never
         Relationships: [
           {
             foreignKeyName: "catering_contratos_ejecutiva_id_fkey"
@@ -1442,6 +1608,55 @@ export type Database = {
           },
         ]
       }
+      v_catering_costos: {
+        Row: {
+          extras_por_tipo: Json | null
+          ajuste_cobertura: number | null
+          catering_contrato_id: string | null
+          extras: number | null
+          iva: number | null
+          iva_comision: number | null
+          pax_subtotal: number | null
+          subtotal: number | null
+          total_con_iva: number | null
+          total_sin_iva: number | null
+        }
+        Relationships: []
+      }
+      v_catering_tarifas: {
+        Row: {
+          adicional_unitario: number | null
+          categoria: string | null
+          catering_contrato_id: string | null
+          cobertura_ars: number | null
+          cubiertos: number | null
+          evento_id: string | null
+          excedente: number | null
+          pax: number | null
+          pendientes: number | null
+          por_acreditar: number | null
+          precio_aplicado: number | null
+          precio_base: number | null
+          saldo_categoria: number | null
+          tarifas_historicas: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catering_contratos_evento_id_fkey"
+            columns: ["evento_id"]
+            isOneToOne: false
+            referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catering_contratos_evento_id_fkey"
+            columns: ["evento_id"]
+            isOneToOne: false
+            referencedRelation: "v_resumen_evento"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_evento_servicios_acreditados: {
         Row: {
           adicionales_monto: number | null
@@ -1461,7 +1676,6 @@ export type Database = {
           total_sin_iva: number | null
           updated_at: string | null
         }
-        ComputedFields: never
         Relationships: [
           {
             foreignKeyName: "evento_servicios_evento_id_fkey"
@@ -1512,6 +1726,7 @@ export type Database = {
       }
       v_resumen_evento: {
         Row: {
+          ajuste_cobertura_catering: number | null
           cliente_nombre: string | null
           estado: Database["public"]["Enums"]["estado_evento"] | null
           fecha_evento: string | null
@@ -1718,6 +1933,16 @@ export type Database = {
         }
         Returns: string
       }
+      guardar_pago_por_personas: {
+        Args: {
+          p_cabecera: Json
+          p_catering: string
+          p_coberturas: Json
+          p_evento_esperado?: string
+          p_pago: string
+        }
+        Returns: string
+      }
       is_admin: { Args: never; Returns: boolean }
       previsualizar_actualizacion_ipc: {
         Args: { p_periodo: string; p_variacion_porcentual: number }
@@ -1729,6 +1954,18 @@ export type Database = {
           monto_total_con_iva_anterior: number
           monto_total_con_iva_proyectado: number
         }[]
+      }
+      reasignar_excedente_catering: {
+        Args: {
+          p_cantidad: number
+          p_categoria: string
+          p_catering: string
+          p_destino: string
+          p_es_catering: boolean
+          p_liberada_esperada: number
+          p_pago: string
+        }
+        Returns: undefined
       }
       recalcular_fecha_contrato_evento: {
         Args: { p_evento_id: string }

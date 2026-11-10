@@ -84,11 +84,17 @@ export async function loadCommercialExport(client: Client, kind: "evento" | "cat
   const catering = row as ExportCatering;
   // No embedded event join or summary view: either could reveal independently restricted data.
   const event = catering.evento_id && allowed("eventos") ? await eventById(catering.evento_id, false) : null;
-  const [items, history, payments, currentContacts] = await Promise.all([
+  const [items, history, payments, currentContacts, costos, tarifas, coberturas] = await Promise.all([
     allRows((start, end) => client.from("catering_items").select("*").eq("catering_contrato_id", id).order("created_at").order("id").range(start, end)),
     allRows((start, end) => client.from("catering_precio_historial").select("*").eq("catering_contrato_id", id).order("fecha", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }).range(start, end)),
     cateringPayments(catering),
     event ? contacts(event.id) : Promise.resolve([]),
+    client.from("v_catering_costos").select("*").eq("catering_contrato_id", id).maybeSingle(),
+    allRows((start, end) => client.from("v_catering_tarifas").select("*").eq("catering_contrato_id", id).order("categoria").range(start, end)),
+    allRows((start, end) => client.from("catering_coberturas").select("*").eq("catering_contrato_id", id).order("pago_id").order("categoria").range(start, end)),
   ]);
-  return { kind, catering, event, eventAllowed: !catering.evento_id || Boolean(event), items, history, payments, contacts: currentContacts };
+  if (costos.error || !costos.data) throw new ExportError(500, "No se pudieron leer los costos del catering.");
+  const activePaymentIds = new Set(payments.map((payment) => payment.pago_id ?? payment.id));
+  return { kind, catering, event, eventAllowed: !catering.evento_id || Boolean(event), items, history, payments,
+    contacts: currentContacts, costos: costos.data, tarifas, coberturas: coberturas.filter((linea) => activePaymentIds.has(linea.pago_id)) };
 }

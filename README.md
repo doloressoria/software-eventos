@@ -307,3 +307,6 @@ aplicación en Supabase SQL Editor.
 El [runbook de imputaciones](docs/imputaciones-cobros.md) describe la
 compatibilidad con pagos históricos, el orden de publicación en SQL Editor
 y la prueba aislada `pnpm test:imputaciones:db`.
+
+Los [cobros de catering por personas](docs/catering-por-personas.md) tienen un
+runbook de publicación manual y la prueba aislada `pnpm test:cobertura:db`.

@@ -4,6 +4,7 @@ import { CateringIngresosSection } from "@/components/catering/catering-ingresos
 import { buttonVariants } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { getCateringById, getCateringDisplayFields } from "@/lib/catering/queries";
+import { canUseScreen, getCurrentScreenPermissions } from "@/lib/roles/access";
 import { getCateringIngresos } from "@/lib/catering/pagos-queries";
 
 type CateringIngresosPageProps = {
@@ -16,7 +17,7 @@ export default async function CateringIngresosPage({
   const { id } = await params;
   const { catering } = await getCateringById(id);
   const display = getCateringDisplayFields(catering);
-  const ingresos = await getCateringIngresos(catering.id);
+  const [ingresos, permisos] = await Promise.all([getCateringIngresos(catering.id), getCurrentScreenPermissions()]);
 
   return (
     <section className="space-y-6">
@@ -41,7 +42,9 @@ export default async function CateringIngresosPage({
 
       <CateringDetalleNav active="ingresos" cateringId={catering.id} />
 
-      <CateringIngresosSection cateringId={catering.id} ingresos={ingresos} />
+      <CateringIngresosSection cateringId={catering.id} ingresos={ingresos}
+        eventoId={catering.eventos ? catering.evento_id ?? undefined : undefined}
+        gestionaCatering={canUseScreen(permisos, "catering", true)} />
     </section>
   );
 }

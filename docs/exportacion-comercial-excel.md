@@ -26,7 +26,8 @@ restricciones, relaciones y políticas. No se modificó la base ni se descargaro
 datos personales. Las consultas reproducibles están en
 `supabase/verification/commercial-export.sql`.
 
-Hallazgos comprobados en esa base, independientemente del SQL de referencia:
+Hallazgos históricos del 21/10/2026, anteriores a la consolidación SQL de
+[catering por personas](catering-por-personas.md).
 
 - `fn_actualizar_totales_catering`, ejecutada por cambios de `catering_items`,
   usa `SUM(catering_items.total)` y el IVA del contrato; `total` de cada ítem es
@@ -57,15 +58,14 @@ Hallazgos comprobados en esa base, independientemente del SQL de referencia:
 | Total servicios | No hay campo único del evento | `getEventoValores`: suma redondeada de los servicios | Misma suma, nombre `TotalServiciosDetalle` |
 | Pagado de un servicio | Existe `total_pagado` | `getEventoValores` lo reemplaza por pagos ordinarios activos | Pagos activos por `evento_servicio_id` |
 | Saldo de un servicio | Existe `saldo_pendiente` | `getEventoValores`: total con IVA menos cobros recalculados, con signo | Saldo del detalle; diferencias persistidas se aclaran |
-| Total catering | `catering_contratos.total_con_iva` | El detalle muestra el campo, con 0 si es nulo | `TotalCateringDetalle`, mismo tratamiento |
-| Saldo catering | `catering_contratos.saldo_pendiente` | El detalle muestra el campo, con signo y 0 si es nulo | `SaldoCateringDetalle`, mismo tratamiento |
-| Desglose actual catering | No es un total independiente guardado | `recalculateCateringTotals` puede escribir los totales al guardar | Diagnóstico que replica esa función, sin ejecutar escrituras |
-| Cobros catering | Existe acumulado `total_pagado` | Ingresos suma los pagos ordinarios activos | Ambos, con etiquetas diferentes si no coinciden |
-| Saldo en Ingresos catering | Derivado | `max(total - cobros ordinarios, 0)` | Se explica cuando difiere del detalle |
+| Total catering | `catering_contratos.total_con_iva` | Total vigente visible en `v_catering_acreditado` | `TotalCateringDetalle`, mismo tratamiento |
+| Saldo catering | `catering_contratos.saldo_pendiente` | `v_catering_acreditado` incluye ajuste por cobertura y acreditación al día | `SaldoCateringDetalle`, mismo tratamiento |
+| Desglose actual catering | `v_catering_costos` | El mismo cálculo SQL de los totales y las tarifas | Importes de la vista, sin repetir el cálculo |
+| Cobros catering | Existe acumulado `total_pagado` | Ingresos y detalle leen el acreditado | Acreditado y movimientos ordinarios visibles, con aviso si difieren |
+| Saldo en Ingresos catering | Derivado | Saldo acreditado de la vista con mínimo 0 | Se explica cuando difiere del detalle |
 
-El diagnóstico está contrastado automáticamente contra la función TypeScript
-real mediante una frontera Supabase simulada. No reemplaza el total visible.
-El modelo SQL se documenta; no se introduce otro cálculo financiero en el Excel.
+Si un total histórico guardado difiere del desglose SQL vigente, el Excel
+informa la diferencia y conserva el total que muestra el detalle.
 
 ## Mapeo de datos y destinos
 
@@ -140,20 +140,19 @@ RLS. Todos los resúmenes se identifican como limitados a información autorizad
 | `B10:B11` | Ejecutiva y razón social disponible |
 | `B12` | Último precio por `fecha DESC, created_at DESC` del historial real |
 | `B13:B14` | Precios de cierre guardados de alimentos y bebidas, sin asumir que componen el precio vigente |
-| `C17`, `C19`, `G18:H19` | Precio vigente general, PAX actuales y producto precio × PAX |
-| Ítems, desde fila 20: `A:B,C,H` | Categoría estable, descripción y precio guardado, aplicado una vez según el modelo TS actual |
+| `C17`, `C19`, `G18:H19` | Precio general de respaldo, PAX actuales y subtotal base SQL por categorías |
+| Tarifas e ítems desde fila 20 | Precio base y adicional por categoría, PAX, saldo de PAX, precio guardado y modo de cada ítem |
 | Columnas de precios restantes hasta Q | Reservadas, sin precios ni cantidades inventados |
 | `TotalCateringDetalle`, `SaldoCateringDetalle` | Valores principales de la pantalla de detalle, ubicados después de los ítems |
 | Pagos y garantías: `A:G` | Misma proyección tipada de pagos que en eventos; bloques separados |
-| Comisión y revisión del desglose | Comisión guardada, IVA de comisión, IVA del precio y los ítems, diagnóstico TS y total sin IVA persistido |
+| Comisión y revisión del desglose | Comisión guardada, IVA de comisión, IVA del precio y los ítems, desglose SQL y total sin IVA persistido |
 | Facturación | Emisión, montos con/sin factura, razón social, CUIT, dirección, concepto y contacto administrativo del contrato |
 | Contactos | Actuales y texto anterior del evento autorizado; texto propio del contrato si es externo |
 
-Los ítems adicionales son importes fuera del precio por persona, como en la
-pantalla actual. No se multiplican nuevamente por PAX. Si hay ítems antiguos de
-alimentos/bebidas, se muestran como “ítem guardado”: el diagnóstico replica que
-la función TS suma sus precios. El `total` SQL y el historial de cambios de un
-ítem no se convierten en una versión histórica de la matriz de precios.
+Los ítems históricos sin categorías de aplicación siguen siendo cargos fijos.
+Los nuevos adicionales por persona aplican a las categorías elegidas. La hoja
+DC incluye las coberturas históricas de los cobros imputados al contrato,
+incluidos su precio aplicado y los PAX reasignados.
 
 Si no existe acceso independiente al evento, no se consulta su fila ni sus
 contactos, tampoco mediante RPC o joins. Los datos ausentes se identifican como
@@ -161,13 +160,12 @@ no disponibles para esa descarga. No se inventa un organizador para un externo.
 
 ### Hojas auxiliares de catering
 
-- **Historial de precios:** `A:G` desde fila 3 contiene fecha, motivo, precio por
-  persona y los cuatro PAX de cada entrada real, incluso si hay más de 15.
-  Ninguna entrada se asigna a un pago.
+- **Historial de precios:** `A:K` desde fila 3 contiene fecha, motivo, precio
+  general, cantidades y precios específicos por categoría de cada versión.
 - **INDEC** y **% FIJO ** conservan geometría y estilos limpios. No hay relación
   del contrato con índices o aplicaciones que habilite llenar estos cuadros.
   Se conservan vacíos con aviso, sin divisiones por cero ni IFERROR.
-- **VALORES TOTALES POR SEPARADO:** `H3` es el precio general × PAX, `H4:H8` los
+- **VALORES TOTALES POR SEPARADO:** `H3` es el subtotal base por categoría, `H4:H8` los
   precios agrupados por las cinco categorías estables, `H9` comisión, `H10` IVA
   del desglose, `H11` diagnóstico actual, `H12` referencia al total principal de
   DC y `H13` diferencia. Si es distinta de cero se declara la falta de

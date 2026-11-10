@@ -1,9 +1,10 @@
+import { camposPreciosCategoria, validarPreciosCategoria } from "./precios-categoria";
 import { isEventoTipo } from "../eventos/types";
 import type { Tables } from "../../types/database.types";
 
 export type CateringFormMode = "create" | "edit";
 
-export type CateringFormFields = {
+export type CateringFormFields = ReturnType<typeof camposPreciosCategoria> & {
   con_evento: string;
   evento_id: string;
   cliente_nombre: string;
@@ -36,6 +37,7 @@ export type CateringFormState = {
 };
 
 export type CateringPayload = {
+  preciosCategoria: ReturnType<typeof validarPreciosCategoria>;
   con_evento: boolean;
   evento_id: string | null;
   cliente_nombre: string | null;
@@ -81,6 +83,7 @@ export function getEmptyCateringFormState(): CateringFormState {
       iva_comision: "0",
       iva_porcentaje: "21",
       notas: "",
+      ...camposPreciosCategoria({}),
       precio_unitario_inicial: "",
       precio_motivo_inicial: "Cotizacion inicial",
     },
@@ -115,6 +118,7 @@ export function getCateringFormStateFromCatering(
       iva_comision: formatFormNumber(rateToPercentage(catering.iva_comision ?? 0)),
       iva_porcentaje: formatFormNumber(rateToPercentage(catering.iva_porcentaje ?? 0)),
       notas: catering.notas ?? "",
+      ...camposPreciosCategoria({}),
       precio_unitario_inicial: "",
       precio_motivo_inicial: "",
     },
@@ -228,6 +232,8 @@ export function validateCateringForm(
     }
   }
 
+  const preciosCategoria = validarPreciosCategoria(fields, errors);
+
   if (Object.keys(errors).length > 0) {
     return {
       state: { fields, errors, formError: "Revisa los campos marcados." },
@@ -257,6 +263,7 @@ export function validateCateringForm(
       iva_comision: percentageToRate(ivaComisionPct ?? 0),
       iva_porcentaje: percentageToRate(ivaPorcentajePct ?? 0),
       notas: nullableTrim(fields.notas),
+      preciosCategoria,
       precio_unitario_inicial: precioUnitarioInicial,
       precio_motivo_inicial: precioMotivoInicial,
     },
@@ -284,6 +291,7 @@ function getCateringFields(formData: FormData): CateringFormFields {
     iva_comision: getString(formData, "iva_comision"),
     iva_porcentaje: getString(formData, "iva_porcentaje"),
     notas: getString(formData, "notas"),
+    ...camposPreciosCategoria(formData),
     precio_unitario_inicial: getString(formData, "precio_unitario_inicial"),
     precio_motivo_inicial: getString(formData, "precio_motivo_inicial"),
   };

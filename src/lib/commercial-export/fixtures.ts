@@ -44,7 +44,7 @@ export function exampleEvent(paymentCount = 8): EventExportData {
 
 export function exampleCatering({ linked = true, mismatch = false, paymentCount = 8, itemCount = 3 } = {}): CateringExportData {
   const event = exampleEvent().event;
-  const items = Array.from({ length: itemCount }, (_, i) => ({ id: fixtureId(300 + i), catering_contrato_id: fixtureId(30), categoria: ["adicional_alimentos", "adicional_bebidas", "adicional_otros"][i % 3], descripcion: `Adicional ficticio ${i + 1}`, precio_unitario: 125, pax: 1, total: 125, orden: i, created_at: event.created_at, updated_at: event.updated_at })) as Tables<"catering_items">[];
+  const items = Array.from({ length: itemCount }, (_, i) => ({ id: fixtureId(300 + i), catering_contrato_id: fixtureId(30), categoria: ["adicional_alimentos", "adicional_bebidas", "adicional_otros"][i % 3], descripcion: `Adicional ficticio ${i + 1}`, precio_unitario: 125, categorias_pax: null, pax: 1, total: 125, orden: i, created_at: event.created_at, updated_at: event.updated_at })) as Tables<"catering_items">[];
   const net = 1200 + itemCount * 125;
   const total = Math.round((net * 1.21 + 242) * 100) / 100;
   const payments = Array.from({ length: paymentCount }, (_, i) => ({ ...examplePayment(i, null, fixtureId(30)), evento_id: linked ? event.id : null }));
@@ -62,8 +62,13 @@ export function exampleCatering({ linked = true, mismatch = false, paymentCount 
     salones: null, usuarios: { full_name: "Ejecutiva de ejemplo", email: "ejecutiva@example.invalid" },
   } as ExportCatering;
   return { kind: "catering", catering, event: linked ? event : null, eventAllowed: true,
-    contacts: linked ? exampleEvent().contacts : [], payments, items,
-    history: Array.from({ length: 17 }, (_, i) => ({ id: fixtureId(400 + i), catering_contrato_id: catering.id, fecha: `2026-10-${String(21 - i).padStart(2, "0")}`, precio_unitario: 100 - i,
+    contacts: linked ? exampleEvent().contacts : [], payments, items, tarifas: [], coberturas: [],
+    costos: { catering_contrato_id: catering.id, pax_subtotal: 1200, extras: itemCount * 125,
+      subtotal: net, iva: Math.round(net * 21) / 100, iva_comision: 42, total_sin_iva: net + 200,
+      total_con_iva: total, ajuste_cobertura: 0,
+      extras_por_tipo: Object.fromEntries(["adicional_alimentos", "adicional_bebidas", "adicional_otros"]
+        .map((categoria) => [categoria, items.filter((item) => item.categoria === categoria).length * 125])) },
+    history: Array.from({ length: 17 }, (_, i) => ({ id: fixtureId(400 + i), catering_contrato_id: catering.id, fecha: `2026-10-${String(21 - i).padStart(2, "0")}`, precio_unitario: 100 - i, precio_adultos: null, precio_jovenes: null, precio_menores: null, precio_bebes: null,
       motivo: i ? "Recotización ficticia" : "Precio vigente ficticio", pax_adultos: 10, pax_jovenes: 2, pax_menores: 0, pax_bebes: 0, usuario_id: fixtureId(11), created_at: event.created_at })),
   };
 }

@@ -5,6 +5,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { getEventoById } from "@/lib/eventos/queries";
 import { getEventoValores } from "@/lib/evento-servicios/queries";
+import { canUseScreen, getCurrentScreenPermissions } from "@/lib/roles/access";
 import { getEventoIngresos } from "@/lib/pagos/queries";
 
 type EventoIngresosPageProps = {
@@ -17,10 +18,11 @@ export default async function EventoIngresosPage({
   params,
 }: EventoIngresosPageProps) {
   const { id } = await params;
-  const { evento } = await getEventoById(id);
-  const [ingresos, valores] = await Promise.all([
+  const { evento, profile } = await getEventoById(id);
+  const [ingresos, valores, permisos] = await Promise.all([
     getEventoIngresos(evento.id),
     getEventoValores(evento.id),
+    getCurrentScreenPermissions(),
   ]);
 
   return (
@@ -53,6 +55,9 @@ export default async function EventoIngresosPage({
         eventoId={evento.id}
         ingresos={ingresos}
         servicios={valores.opcionesPago}
+        actorId={profile.id}
+        admin={profile.rol === "admin"}
+        gestionaEventos={canUseScreen(permisos, "eventos", true)}
       />
     </section>
   );

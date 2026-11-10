@@ -41,6 +41,9 @@ export type CateringExportData = CateringSummary & {
   contacts: ExportContact[];
   items: Tables<"catering_items">[];
   history: Tables<"catering_precio_historial">[];
+  costos: Tables<"v_catering_costos">;
+  tarifas: Tables<"v_catering_tarifas">[];
+  coberturas: Tables<"catering_coberturas">[];
 };
 export type CommercialExportData = EventExportData | CateringExportData;
 

@@ -18,6 +18,8 @@ export const AUDITED_TABLES = [
   "pago_imputaciones",
   "egresos",
   "catering_contratos",
+  "catering_coberturas",
+  "catering_precio_historial",
   "catering_items",
   "usuarios",
   "usuario_salon",

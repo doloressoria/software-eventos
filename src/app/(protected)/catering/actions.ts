@@ -24,6 +24,7 @@ import {
   validateEgresoForm,
   type EgresoFormState,
 } from "@/lib/egresos/validation";
+import { guardarCobertura } from "@/lib/catering/guardar-cobertura";
 import { createClient } from "@/lib/supabase/server";
 import { logSupabaseError } from "@/lib/supabase/errors";
 import { requireScreenManagement } from "@/lib/roles/access";
@@ -83,6 +84,7 @@ export async function createCateringAction(
 
   const { data, error } = await supabase.rpc("crear_catering_con_precio", {
     p_contrato: {
+      ...payload.preciosCategoria,
       evento_id: payload.evento_id,
       cliente_nombre: payload.cliente_nombre,
       cliente_razon_social: payload.cliente_razon_social,
@@ -267,13 +269,7 @@ export async function addPrecioHistorialAction(
   const supabase = await createClient();
   const { error } = await supabase.from("catering_precio_historial").insert({
     catering_contrato_id: cateringId,
-    precio_unitario: payload.precio_unitario,
-    motivo: payload.motivo,
-    fecha: payload.fecha,
-    pax_adultos: payload.pax_adultos,
-    pax_jovenes: payload.pax_jovenes,
-    pax_menores: payload.pax_menores,
-    pax_bebes: payload.pax_bebes,
+    ...payload,
     usuario_id: profile.id,
   });
 
@@ -316,9 +312,7 @@ export async function addCateringItemAction(
   const supabase = await createClient();
   const { error } = await supabase.from("catering_items").insert({
     catering_contrato_id: cateringId,
-    categoria: payload.categoria,
-    descripcion: payload.descripcion,
-    precio_unitario: payload.precio_unitario,
+    ...payload,
     pax: 1,
   });
 
@@ -405,6 +399,12 @@ async function saveCateringPago(cateringId: string, pagoId: string | null, formD
 
   if (!current) {
     return { ...state, formError: NOT_FOUND_ERROR };
+  }
+
+  if (!pagoId && formData.get("modo_pago") === "personas") {
+    const result = await guardarCobertura(formData, state, payload, { cateringId });
+    if (result.successMessage) revalidateCateringPaths(cateringId, current.evento_id);
+    return result;
   }
 
   const supabase = await createClient();

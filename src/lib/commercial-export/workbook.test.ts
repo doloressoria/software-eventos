@@ -44,7 +44,7 @@ test("evento conserva formato, IVA parcial, divisas, contactos y resultados ante
   assert.ok(loaded.definedNames.getRanges("TotalServiciosDetalle").ranges.length);
 });
 
-test("catering extiende pagos, ítems e historial y reconcilia hojas sin asignar PAX a cobros", async () => {
+test("catering extiende pagos, ítems e historial y reconcilia hojas para cobros legados", async () => {
   const data = exampleCatering({ paymentCount: 35, itemCount: 18 });
   const amounts = cateringAmounts(data);
   const book = await buildCommercialWorkbook(data);
@@ -201,4 +201,28 @@ test("el Excel separa las imputaciones acreditadas de un único cobro", async ()
   assert.equal(amount(book, "CLIENTE", "Cobros ordinarios de servicios", 7), 300000);
   assert.equal(amount(book, "Catering", "Cobros ordinarios registrados", 7), 700000);
   assert.equal(texts(book).filter((value) => value.includes(`Imputación del cobro ${common.pago_id}`)).length, 3);
+});
+
+test("el Excel de catering conserva el importe histórico y toma el saldo SQL de los PAX pendientes", async () => {
+  const data = exampleCatering({ paymentCount: 1, itemCount: 0 });
+  data.catering.saldo_pendiente = 225000;
+  data.catering.total_pagado = 400000;
+  data.tarifas = [{
+    categoria: "jovenes", catering_contrato_id: data.catering.id, evento_id: data.catering.evento_id,
+    pax: 15, precio_base: 44000, adicional_unitario: 1000, precio_aplicado: 45000,
+    cubiertos: 10, cobertura_ars: 400000, excedente: 0, pendientes: 5,
+    por_acreditar: 0, saldo_categoria: 225000, tarifas_historicas: 1,
+  }];
+  data.coberturas = [{
+    pago_id: data.payments[0].id, catering_contrato_id: data.catering.id, categoria: "jovenes",
+    cantidad: 10, precio_aplicado: 40000, importe_historico: 400000, liberada: 0,
+  }];
+  const book = await buildCommercialWorkbook(data);
+  const sheet = book.getWorksheet("DC")!;
+  const rows: (number | null)[][] = [];
+  sheet.eachRow((row) => {
+    if (row.getCell(1).value === "Jóvenes") rows.push([2, 3, 4, 5, 8].map((col) => row.getCell(col).value as number | null));
+  });
+  assert.deepEqual(rows, [[15, 44000, 1000, 45000, 225000], [10, 40000, 400000, 0, null]]);
+  assert.equal(amount(book, "DC", "Saldo pendiente — detalle", 8), 225000);
 });

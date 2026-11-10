@@ -19,6 +19,7 @@ import { getEventoValores } from "@/lib/evento-servicios/queries";
 import { getEventoCaterings } from "@/lib/catering/queries";
 import { getEventoContactos } from "@/lib/contactos/queries";
 import { ContactosSection } from "@/components/eventos/contactos-section";
+import { categoriasPax, paxCateringDistinto, totalInvitados } from "@/lib/eventos/asistentes";
 
 type EventoDetallePageProps = {
   params: Promise<{
@@ -161,10 +162,15 @@ export default async function EventoDetallePage({
           </CardHeader>
           <CardContent>
             <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-              <DetailItem label="Adultos" value={formatNumber(evento.pax_adultos)} />
-              <DetailItem label="Jovenes" value={formatNumber(evento.pax_jovenes)} />
-              <DetailItem label="Menores" value={formatNumber(evento.pax_menores)} />
-              <DetailItem label="Bebes" value={formatNumber(evento.pax_bebes)} />
+              <DetailItem label="Total de invitados" value={totalInvitados(evento)} />
+              {categoriasPax.map(([categoria, label]) => (
+                <DetailItem key={categoria} label={label} value={evento[`pax_${categoria}`]} />
+              ))}
+              {paxCateringDistinto(evento, caterings).map((catering) => (
+                <DetailItem key={catering.id}
+                  label={catering.tipo_servicio ? `PAX de catering · ${catering.tipo_servicio}` : "PAX de catering"}
+                  value={totalInvitados(catering)} />
+              ))}
             </dl>
           </CardContent>
         </Card>
@@ -278,10 +284,6 @@ function formatDate(value: string | null) {
     timeZone: "UTC",
     year: "numeric",
   }).format(new Date(`${value}T00:00:00.000Z`));
-}
-
-function formatNumber(value: number | null) {
-  return value === null ? null : value;
 }
 
 function getEstadoLabel(estado: string) {

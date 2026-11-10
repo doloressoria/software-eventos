@@ -1,6 +1,9 @@
+import { CoberturaDetalle, CoberturaResumen } from "@/components/catering/cobertura-resumen";
+import { ReasignarExcedenteForm } from "@/components/catering/reasignar-excedente-form";
+import { isChequePending } from "@/lib/pagos/calculos";
 import { PagoFechas } from "@/components/pagos/pago-fechas";
 import { PagoImporte } from "@/components/pagos/pago-importe";
-import { createPagoAction, deletePagoAction, updatePagoAction } from "@/app/(protected)/pagos/actions";
+import { createPagoAction, deletePagoAction, reasignarExcedenteAction, updatePagoAction } from "@/app/(protected)/pagos/actions";
 import { DeletePagoForm } from "@/components/pagos/delete-pago-form";
 import { PagoForm } from "@/components/pagos/pago-form";
 import { Badge } from "@/components/ui/badge";
@@ -28,12 +31,18 @@ type IngresosEventoSectionProps = {
   eventoId: string;
   ingresos: EventoIngresos;
   servicios: EventoServicioPagoOption[];
+  actorId: string;
+  admin: boolean;
+  gestionaEventos: boolean;
 };
 
 export function IngresosEventoSection({
   eventoId,
   ingresos,
   servicios,
+  actorId,
+  admin,
+  gestionaEventos,
 }: IngresosEventoSectionProps) {
   const destinos = [
     ...servicios.map((servicio) => ({
@@ -58,7 +67,7 @@ export function IngresosEventoSection({
       <CardContent className="space-y-8">
         <dl className="grid gap-4 md:grid-cols-3">
           <SummaryItem
-            label="Total evento"
+            label={ingresos.coberturas.length ? "Total a precios vigentes" : "Total evento"}
             value={formatCurrency(ingresos.totalEvento)}
           />
           <SummaryItem
@@ -70,6 +79,10 @@ export function IngresosEventoSection({
             value={formatCurrency(ingresos.saldoPendiente)}
           />
         </dl>
+
+        {ingresos.coberturas.map(({ id, label, tarifas }) => (
+          <CoberturaResumen key={id} label={label} tarifas={tarifas} />
+        ))}
 
         <div className="rounded-lg border border-slate-100">
           {ingresos.pagos.length > 0 ? (
@@ -111,6 +124,21 @@ export function IngresosEventoSection({
                             ))}
                           </ul>
                         )}
+                        {pago.catering_coberturas.map((cobertura) => {
+                          const tarifa = ingresos.coberturas.find((c) => c.id === cobertura.catering_contrato_id)
+                            ?.tarifas.find((t) => t.categoria === cobertura.categoria);
+                          const maximo = Math.min(tarifa?.excedente ?? 0, cobertura.cantidad - cobertura.liberada);
+                          const elegibles = destinos.filter((d) => d.value !== `catering:${cobertura.catering_contrato_id}`);
+                          return <div key={cobertura.categoria} className="mt-2 text-sm">
+                            <CoberturaDetalle cobertura={cobertura} />
+                            {gestionaEventos && (admin || pago.registrado_por === actorId) && maximo > 0
+                              && elegibles.length > 0 && tarifa?.tarifas_historicas === 1 && !isChequePending(pago) && (
+                              <ReasignarExcedenteForm key={cobertura.liberada}
+                                action={reasignarExcedenteAction.bind(null, eventoId, pago.id, cobertura.catering_contrato_id, cobertura.categoria, cobertura.liberada)}
+                                destinos={elegibles} maximo={maximo} precio={cobertura.precio_aplicado} />
+                            )}
+                          </div>;
+                        })}
                       </TableCell>
                       <TableCell>{getFormaPagoLabel(pago.forma_pago)}</TableCell>
                       <TableCell className="text-right font-medium text-slate-950">
@@ -120,13 +148,13 @@ export function IngresosEventoSection({
                         {pago.notas ?? "-"}
                       </TableCell>
                       <TableCell className="text-right">
-                        <details className="mb-3 text-left">
+                        {pago.catering_coberturas.length === 0 && <details className="mb-3 text-left">
                           <summary className="cursor-pointer text-sm">Editar pago</summary>
                           <div className="min-w-72 p-3">
                             <PagoForm editing action={updatePagoAction.bind(null, eventoId, pago.id)}
                               initialState={{ ...getPagoEditState(pago), imputaciones: lineas }} destinos={destinos} />
                           </div>
-                        </details>
+                        </details>}
                         <DeletePagoForm
                           action={deletePagoAction.bind(
                             null,
@@ -155,7 +183,7 @@ export function IngresosEventoSection({
           <div className="mt-4">
             {destinos.length ? (
               <PagoForm action={createPagoAction.bind(null, eventoId)}
-                initialState={getEmptyPagoFormState()} destinos={destinos} />
+                initialState={getEmptyPagoFormState()} destinos={destinos} coberturas={gestionaEventos ? ingresos.coberturas : undefined} />
             ) : <p className="text-sm">Agregá un servicio o vinculá un catering para registrar un cobro.</p>}
           </div>
         </div>

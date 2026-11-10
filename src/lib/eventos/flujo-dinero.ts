@@ -122,7 +122,7 @@ export type EventoFlujoDinero = {
 
 type ResumenEventoRow = Pick<
   Tables<"v_resumen_evento">,
-  "total_catering" | "total_servicios"
+  "total_catering" | "total_servicios" | "ajuste_cobertura_catering"
 >;
 
 type MoneyRow = {
@@ -179,7 +179,7 @@ export async function getEventoFlujoDinero(
       .order("created_at", { ascending: true }),
     supabase
       .from("v_resumen_evento")
-      .select("total_catering, total_servicios")
+      .select("total_catering, total_servicios, ajuste_cobertura_catering")
       .eq("id", evento.id)
       .maybeSingle(),
   ]);
@@ -227,7 +227,7 @@ export async function getEventoFlujoDinero(
     payments: pagos,
   });
   const saldoPendienteCobro =
-    totalEvento === null ? null : Math.max(roundMoney(totalEvento - totalIngresos), 0);
+    totalEvento === null ? null : Math.max(roundMoney(totalEvento + (resumen?.ajuste_cobertura_catering ?? 0) - totalIngresos), 0);
   const serviciosResumen = getServiciosResumen(
     servicios,
     egresos,

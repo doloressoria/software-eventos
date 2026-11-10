@@ -211,6 +211,7 @@ type ResumenEventoRow = Pick<
   Tables<"v_resumen_evento">,
   | "id"
   | "saldo_catering"
+  | "ajuste_cobertura_catering"
   | "saldo_servicios"
   | "total_catering"
   | "total_servicios"
@@ -314,6 +315,7 @@ export async function getReportesGenerales(
       total_catering: contrato.total_con_iva,
       total_servicios: 0,
       saldo_catering: contrato.saldo_pendiente,
+      ajuste_cobertura_catering: 0,
       saldo_servicios: 0,
     });
   }
@@ -672,7 +674,7 @@ async function getResumenEventos(eventoIds: string[]) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("v_resumen_evento")
-    .select("id, total_catering, total_servicios, saldo_catering, saldo_servicios")
+    .select("id, total_catering, total_servicios, saldo_catering, saldo_servicios, ajuste_cobertura_catering")
     .in("id", eventoIds);
 
   if (error) {
@@ -778,9 +780,10 @@ function getEventosPendientes(
         toMoneyNumber(resumen?.total_catering) +
           toMoneyNumber(resumen?.total_servicios),
       );
+      const ajusteCobertura = resumen?.ajuste_cobertura_catering ?? 0;
       const saldoPendiente = Math.max(
         roundMoney(
-          totalEstimado - (ingresosByEvento.get(evento.id) ?? 0),
+          totalEstimado + ajusteCobertura - (ingresosByEvento.get(evento.id) ?? 0),
         ),
         0,
       );
@@ -802,7 +805,7 @@ function getEventosPendientes(
       fechaEvento: contrato.fecha_evento ?? "",
       id: getCateringReportId(contrato.id),
       href: `/catering/${contrato.id}/ingresos`,
-      saldoPendiente: Math.max(roundMoney(toMoneyNumber(contrato.total_con_iva) - (ingresosByEvento.get(getCateringReportId(contrato.id)) ?? 0)), 0),
+      saldoPendiente: Math.max(toMoneyNumber(contrato.saldo_pendiente), 0),
       salon: `Kiria · ${contrato.lugar_evento?.trim() || "Sin especificar"}`,
       totalEstimado: toMoneyNumber(contrato.total_con_iva),
       vendedor: "Ejecutiva de catering",

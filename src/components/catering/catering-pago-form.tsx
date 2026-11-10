@@ -1,12 +1,14 @@
 "use client";
 
 import { PagoForm } from "@/components/pagos/pago-form";
+import type { OpcionCobertura } from "@/lib/catering/coberturas";
 import type { PagoFormState } from "@/lib/pagos/validation";
 
 export function CateringPagoForm(props: {
   action: (previousState: PagoFormState, formData: FormData) => Promise<PagoFormState>;
   initialState: PagoFormState;
   editing?: boolean;
+  coberturas?: OpcionCobertura[];
 }) {
   return <PagoForm {...props} />;
 }

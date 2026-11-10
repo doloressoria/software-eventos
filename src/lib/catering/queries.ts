@@ -192,6 +192,10 @@ export type CateringPrecioHistorialItem = Pick<
   | "fecha"
   | "motivo"
   | "precio_unitario"
+  | "precio_adultos"
+  | "precio_jovenes"
+  | "precio_menores"
+  | "precio_bebes"
   | "pax_adultos"
   | "pax_jovenes"
   | "pax_menores"
@@ -203,7 +207,7 @@ export type CateringPrecioHistorialItem = Pick<
 
 export type CateringItemRow = Pick<
   Tables<"catering_items">,
-  "id" | "categoria" | "descripcion" | "precio_unitario"
+  "id" | "categoria" | "descripcion" | "precio_unitario" | "categorias_pax"
 >;
 
 export type CateringDetalle = CateringRow & {
@@ -263,13 +267,13 @@ export async function getCateringById(id: string) {
       .maybeSingle(),
     supabase
       .from("catering_items")
-      .select("id, categoria, descripcion, precio_unitario")
+      .select("id, categoria, descripcion, precio_unitario, categorias_pax")
       .eq("catering_contrato_id", id)
       .order("created_at", { ascending: true }),
     supabase
       .from("catering_precio_historial")
       .select(
-        "id, fecha, motivo, precio_unitario, pax_adultos, pax_jovenes, pax_menores, pax_bebes, created_at, usuarios(full_name, email)",
+        "id, fecha, motivo, precio_unitario, precio_adultos, precio_jovenes, precio_menores, precio_bebes, pax_adultos, pax_jovenes, pax_menores, pax_bebes, created_at, usuarios(full_name, email)",
       )
       .eq("catering_contrato_id", id)
       .order("fecha", { ascending: false })
@@ -306,6 +310,7 @@ export async function getCateringById(id: string) {
   return {
     catering,
     items,
+    totalAdicionales: cateringResult.data.total_adicionales ?? 0,
     precioHistorial,
     precioVigente: precioHistorial[0]?.precio_unitario ?? null,
     profile,
