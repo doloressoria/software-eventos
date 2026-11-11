@@ -26,6 +26,10 @@ export type DeleteEventoState = {
   formError?: string;
 };
 
+export type ConfirmarEventoState = {
+  formError?: string;
+};
+
 const DELETE_EVENTO_ERROR =
   "No se pudo eliminar el evento. Verifica los datos e intenta nuevamente.";
 
@@ -269,6 +273,63 @@ export async function updateEventoAction(
       shouldReviewSalonPrices: authorizedEvento.salon_id !== payload.salon_id,
     }),
   );
+}
+
+export async function confirmarEventoAction(
+  id: string,
+  previousState: ConfirmarEventoState,
+  formData: FormData,
+): Promise<ConfirmarEventoState> {
+  void previousState;
+  void formData;
+
+  const profile = await getCurrentProfile();
+
+  if (!profile?.activo) {
+    redirect("/dashboard");
+  }
+
+  const authorizedEvento = await getAuthorizedActiveEvento(id, profile);
+
+  if (!authorizedEvento) {
+    return { formError: "No se pudo confirmar el evento. Verifica tus permisos." };
+  }
+
+  const evento = await getEditableEventoById(id);
+
+  if (!evento || evento.estado !== "borrador") {
+    return { formError: "Solo se pueden confirmar eventos en borrador. Recargá la página." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("eventos")
+    .update({
+      estado: "confirmado",
+      fecha_confirmacion_presupuesto:
+        evento.fecha_confirmacion_presupuesto ?? getTodayInputValue(),
+    })
+    .eq("id", id)
+    .eq("estado", "borrador")
+    .eq("updated_at", evento.updated_at)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    logSupabaseError("confirmarEventoAction confirmar evento", error);
+    return { formError: "No se pudo confirmar el evento. Intenta nuevamente." };
+  }
+
+  if (!data) {
+    return { formError: "El evento cambió. Recargá la página antes de confirmarlo." };
+  }
+
+  revalidatePath("/eventos", "layout");
+  revalidatePath("/dashboard");
+  revalidatePath("/reportes");
+  revalidatePath("/admin/actualizaciones-ipc");
+  redirect(`/eventos/${id}?confirmed=1`);
 }
 
 export async function deleteEventoAction(

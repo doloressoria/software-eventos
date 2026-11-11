@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ExportExcelButton, ExportExcelScope } from "@/components/commercial-export";
-import { deleteEventoAction } from "@/app/(protected)/eventos/actions";
+import { confirmarEventoAction, deleteEventoAction } from "@/app/(protected)/eventos/actions";
+import { ConfirmarEventoForm } from "@/components/eventos/confirmar-evento-form";
 import { EventoDetalleNav } from "@/components/eventos/evento-detalle-nav";
 import { DeleteEventoForm } from "@/components/eventos/delete-evento-form";
 import { ValoresEventoSection } from "@/components/evento-servicios/valores-evento-section";
@@ -20,6 +21,7 @@ import { getEventoCaterings } from "@/lib/catering/queries";
 import { getEventoContactos } from "@/lib/contactos/queries";
 import { ContactosSection } from "@/components/eventos/contactos-section";
 import { categoriasPax, paxCateringDistinto, totalInvitados } from "@/lib/eventos/asistentes";
+import { canUseScreen, getCurrentScreenPermissions } from "@/lib/roles/access";
 
 type EventoDetallePageProps = {
   params: Promise<{
@@ -35,13 +37,15 @@ export default async function EventoDetallePage({
   const { id } = await params;
   const paramsQuery = searchParams ? await searchParams : {};
   const { evento } = await getEventoById(id);
-  const [valores, caterings, contactos] = await Promise.all([
+  const [valores, caterings, contactos, permissions] = await Promise.all([
     getEventoValores(evento.id),
     getEventoCaterings(evento.id),
     getEventoContactos(evento.id),
+    getCurrentScreenPermissions(),
   ]);
   const wasCreated = Boolean(paramsQuery.created);
   const wasUpdated = Boolean(paramsQuery.updated);
+  const wasConfirmed = Boolean(paramsQuery.confirmed) && evento.estado === "confirmado";
   const preciosAutocompletados = getSearchParamValue(
     paramsQuery.precios_autocompletados,
   );
@@ -57,6 +61,9 @@ export default async function EventoDetallePage({
         actions={
           <>
             <ExportExcelButton kind="evento" id={evento.id} />
+            {evento.estado === "borrador" && canUseScreen(permissions, "eventos", true) ? (
+              <ConfirmarEventoForm action={confirmarEventoAction.bind(null, evento.id)} />
+            ) : null}
             <Link
               href={`/eventos/${evento.id}/editar`}
               className={buttonVariants({ variant: "primary" })}
@@ -82,13 +89,15 @@ export default async function EventoDetallePage({
         }
       />
 
-      {wasCreated || wasUpdated ? (
+      {wasCreated || wasUpdated || wasConfirmed ? (
         <Alert
           role="status"
           variant="success"
           className="font-medium"
         >
-          {wasUpdated
+          {wasConfirmed
+            ? "Evento confirmado correctamente."
+            : wasUpdated
             ? "Evento actualizado correctamente."
             : "Evento creado correctamente."}
         </Alert>

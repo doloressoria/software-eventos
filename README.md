@@ -51,6 +51,15 @@ Fill in `.env.local` with the Supabase project values.
 Never expose `SUPABASE_SERVICE_ROLE_KEY` in client components, browser bundles or
 public logs.
 
+## Confirmación de eventos
+
+En el detalle de un evento en borrador, **Confirmar evento** cambia su estado a
+**Confirmado** y completa la fecha de confirmación de presupuesto con el día
+actual de Argentina si estaba vacía. Requiere permiso de gestión de eventos y
+acceso al salón; conserva la fecha existente. Los demás estados siguen
+disponibles en **Editar**. Si el evento cambió mientras se confirmaba, se debe
+recargar la página antes de reintentar.
+
 ## Administrative User Management
 
 Administrators manage users at `/admin/usuarios` and configure roles at
