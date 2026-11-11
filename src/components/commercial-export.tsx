@@ -53,7 +53,7 @@ export function useExportForm(ref: FormRef, pending: boolean, success: boolean, 
   useEffect(() => { update?.(ref, pending, success); }, [update, ref, pending, success, revision]);
 }
 
-export function ExportExcelButton({ kind, id }: { kind: "evento" | "catering"; id: string }) {
+export function ExportExcelButton({ kind, id }: { kind: "evento" | "catering" | "pagos"; id: string }) {
   const scope = useContext(Scope);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +63,7 @@ export function ExportExcelButton({ kind, id }: { kind: "evento" | "catering"; i
     if (scope?.hasChanges() && !window.confirm("Tenés cambios sin guardar. El Excel incluirá únicamente los datos guardados. ¿Querés descargarlo igualmente?")) return;
     setDownloading(true);
     try {
-      const response = await fetch(`/${kind === "evento" ? "eventos" : "catering"}/${encodeURIComponent(id)}/excel`, { cache: "no-store", credentials: "same-origin" });
+      const response = await fetch(`/${kind === "catering" ? "catering" : "eventos"}/${encodeURIComponent(id)}/${kind === "pagos" ? "ingresos/" : ""}excel`, { cache: "no-store", credentials: "same-origin" });
       if (response.redirected) throw new Error("La sesión venció o no tenés permiso para esta descarga. Recargá el detalle.");
       if (!response.ok) {
         const result = await response.json().catch(() => null);
@@ -84,7 +84,7 @@ export function ExportExcelButton({ kind, id }: { kind: "evento" | "catering"; i
   return <div className="space-y-2">
     <button type="button" onClick={download} disabled={downloading || scope?.pending} aria-busy={downloading}
       className={buttonVariants({ variant: "secondary" })}>
-      {downloading ? "Generando Excel…" : scope?.pending ? "Guardando…" : "Exportar a Excel"}
+      {downloading ? "Generando Excel…" : scope?.pending ? "Guardando…" : kind === "pagos" ? "Descargar detalle de pagos" : "Exportar a Excel"}
     </button>
     {error ? <Alert role="alert" variant="destructive" className="max-w-md text-sm">{error}</Alert> : null}
   </div>;

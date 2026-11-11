@@ -14,6 +14,7 @@ import { cantidadPax, totalVistaPrevia, type OpcionCobertura } from "@/lib/cater
 import { categoriasPax, type CategoriaPax } from "@/lib/eventos/asistentes";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PagoImputacionesFields } from "@/components/pagos/pago-imputaciones-fields";
+import { useExportForm } from "@/components/commercial-export";
 
 const currency = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" });
 
@@ -31,7 +32,7 @@ type PagoFormProps = {
 export function PagoForm({ action, initialState, destinos, coberturas, editing = false }: PagoFormProps) {
   const requestInput = useRef<HTMLInputElement>(null);
   const requestId = useRef<string | null>(null);
-  const [state, formAction] = useActionState(action, initialState);
+  const [state, formAction, pending] = useActionState(action, initialState);
   const id = useId();
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -41,6 +42,7 @@ export function PagoForm({ action, initialState, destinos, coberturas, editing =
       formRef.current?.reset();
     }
   }, [state, editing]);
+  useExportForm(formRef, pending, Boolean(state.successMessage), state);
 
   return (
     <form ref={formRef} action={formAction} className="space-y-5" noValidate onSubmit={() => {

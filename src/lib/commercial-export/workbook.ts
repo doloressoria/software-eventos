@@ -4,7 +4,7 @@ import { nombreCategoria } from "../catering/coberturas";
 import { categoriasPax } from "../eventos/asistentes";
 import { cateringAmounts, ordinaryPayments, PARTIAL_NOTICE, paymentAmount, SEPARATE_NOTICE, serviceAmounts, uniquePayments } from "./calculations";
 import { getArgentinaPaymentDay, isChequePending, roundMoney, sumGuarantees, sumOrdinaryPayments, toMoneyNumber } from "../pagos/calculos";
-import { ExportError, type CateringExportData, type CommercialExportData, type EventExportData, type ExportContact, type ExportPayment } from "./types";
+import { ExportError, type CateringExportData, type CommercialExportData, type EventExportData, type ExportContact, type ExportPayment, type PaymentHistoryExportData } from "./types";
 
 const MONEY = '#,##0.00;[Red]-#,##0.00';
 const DATE = "dd/mm/yyyy";
@@ -89,7 +89,7 @@ function finish(sheet: Sheet, lastRow: number, columns = 7) {
   sheet.pageSetup.printArea = `A$1:${String.fromCharCode(64 + columns)}$${lastRow}`;
 }
 
-function paymentLabel(payment: ExportPayment) {
+function paymentLabel(payment: Pick<ExportPayment, "forma_pago" | "moneda">) {
   const labels: Record<string, string> = { efectivo_pesos: "Efectivo", efectivo_dolares: "Efectivo", transferencia: "Transferencia", cheque: "Cheque", retenciones: "Retenciones", efectivo_euros: "Efectivo" };
   return `${labels[payment.forma_pago] ?? payment.forma_pago} ${payment.moneda}`;
 }
@@ -392,20 +392,120 @@ function cateringWorkbook(book: ExcelJS.Workbook, template: ExcelJS.Workbook, da
   finish(history, Math.max(3, data.history.length + 2), 11);
 }
 
+function paymentHistoryWorkbook(book: ExcelJS.Workbook, template: ExcelJS.Workbook, data: PaymentHistoryExportData) {
+  const source = template.getWorksheet("CLIENTE")!;
+  const { event, ingresos } = data;
+  const payments = ingresos.pagos;
+  const ids = new Map(payments.map((p, i) => [p.id, i + 1]));
+  const destinations = new Map([
+    ...data.servicios.map((s) => [`servicio:${s.id}`, s.servicios_catalogo?.nombre ?? "Servicio sin nombre"] as const),
+    ...ingresos.cateringDestinos.map((c) => [c.value, c.label] as const),
+  ]);
+  const pending = (p: (typeof payments)[number]) => isChequePending(p, ingresos.fechaSaldo);
+  const sheet = sheetFromTemplate(book, source, "PAGOS", 12);
+  [9, 15, 17, 29, 22, 10, 17, 18, 20, 18, 22, 18].forEach((width, i) => { sheet.getColumn(i + 1).width = width; });
+  let r = 1;
+  band(sheet, source, r++, "DETALLE DE PAGOS", 12);
+  note(sheet, source, r++, `Cliente: ${event.cliente_nombre}\nEvento: ${event.nombre_evento ?? event.tipo_evento ?? "Sin nombre"}\nSalón: ${event.salones?.nombre ?? "No disponible"}`, 12);
+  row(sheet, source, r++, 90, ["Fecha del evento", date(event.fecha_evento), "Saldo al", date(ingresos.fechaSaldo)], 12);
+  total(sheet, source, r++, "Total a precios vigentes (ARS)", ingresos.totalEvento, 12);
+  total(sheet, source, r++, "Ajuste por cobertura histórica de catering (ARS)", ingresos.ajusteCobertura, 12);
+  total(sheet, source, r++, "Ingresos ordinarios acreditados (ARS)", ingresos.totalCobrado, 12);
+  total(sheet, source, r++, "Saldo pendiente (ARS)", ingresos.saldoPendiente, 12);
+  total(sheet, source, r++, "Cheques ordinarios pendientes de acreditación (ARS)", sum(payments.filter((p) => !p.es_garantia && pending(p)).map((p) => p.importe_en_pesos)), 12);
+  total(sheet, source, r++, "Garantías registradas (ARS)", sumGuarantees(payments), 12);
+  note(sheet, source, r++, "Saldo a la fecha indicada, con mínimo cero: total vigente + ajuste por cobertura histórica − ingresos ordinarios acreditados. Las garantías y los cheques pendientes no reducen el saldo. Para cheques, la fecha de pago / acreditación es su fecha de acreditación prevista.", 12);
+  if (payments.some((p) => p.moneda !== "ARS" && p.importe_en_pesos === null)) {
+    note(sheet, source, r++, "Hay cobros sin equivalente histórico en ARS. Sus celdas quedan vacías; los totales incluyen únicamente los equivalentes disponibles, igual que Ingresos. No se recalculan con una cotización actual.", 12);
+  }
+  for (const guarantee of [false, true]) {
+    band(sheet, source, r++, guarantee ? "GARANTÍAS" : "COBROS ORDINARIOS", 12);
+    row(sheet, source, r++, 42, ["Cobro", "Fecha de registro", "Pago / acreditación", "Concepto", "Medio de pago", "Moneda", "Cotización ARS", "Importe original", "Equivalente ARS", "Estado", "Banco", "N° cheque"], 12);
+    const group = payments.filter((p) => p.es_garantia === guarantee);
+    for (const p of group) {
+      row(sheet, source, r, 43, [ids.get(p.id)!, date(getArgentinaPaymentDay(new Date(p.created_at))), date(p.fecha_pago), p.concepto,
+        paymentLabel(p).replace(` ${p.moneda}`, ""), p.moneda, p.moneda === "ARS" ? null : p.tipo_cambio,
+        p.importe_moneda_original, p.importe_en_pesos, p.forma_pago === "cheque" ? pending(p) ? "Pendiente" : "Acreditado" : "Registrado", p.banco, p.numero_cheque], 12);
+      sheet.getCell(r++, 1).numFmt = "0";
+    }
+    if (!group.length) note(sheet, source, r++, guarantee ? "Sin garantías registradas." : "Sin cobros ordinarios registrados.", 12);
+  }
+  sheet.views = [{ state: "frozen", ySplit: 1, showGridLines: false }];
+  finish(sheet, r - 1, 12);
+
+  const allocations = sheetFromTemplate(book, source, "IMPUTACIONES", 4);
+  [9, 48, 22, 22].forEach((width, i) => { allocations.getColumn(i + 1).width = width; });
+  band(allocations, source, 1, "IMPUTACIONES POR DESTINO", 4);
+  note(allocations, source, 2, "El número de cobro corresponde a PAGOS. Los importes de esta hoja distribuyen el cobro; no son ingresos adicionales. Las garantías se identifican por separado.", 4);
+  row(allocations, source, 3, 42, ["Cobro", "Destino", "Importe imputado ARS", "Tipo"], 4);
+  r = 4;
+  for (const p of payments) {
+    const lines = p.pago_imputaciones.length ? p.pago_imputaciones : [{ evento_servicio_id: p.evento_servicio_id,
+      catering_contrato_id: p.catering_contrato_id, importe_ars: p.importe_en_pesos }];
+    for (const line of lines) {
+      const destination = line.evento_servicio_id ? `servicio:${line.evento_servicio_id}` : line.catering_contrato_id ? `catering:${line.catering_contrato_id}` : null;
+      row(allocations, source, r, 43, [ids.get(p.id)!, destination ? destinations.get(destination) ?? `Destino no disponible (${destination})` : "Sin imputación",
+        line.importe_ars, p.es_garantia ? "Garantía" : "Cobro ordinario"], 4);
+      allocations.getCell(r++, 1).numFmt = "0";
+    }
+  }
+  if (!payments.length) note(allocations, source, r++, "Sin imputaciones registradas.", 4);
+  allocations.views = [{ state: "frozen", ySplit: 3, showGridLines: false }];
+  finish(allocations, r - 1, 4);
+
+  const pax = sheetFromTemplate(book, source, "PAX", 10);
+  [9, 34, 18, 18, 18, 18, 18, 20, 22, 20].forEach((width, i) => { pax.getColumn(i + 1).width = width; });
+  band(pax, source, 1, "COBERTURA POR CATEGORÍA", 10);
+  note(pax, source, 2, `Cobertura al ${ingresos.fechaSaldo}. Los PAX de cheques pendientes siguen por acreditar. El precio histórico aplicado se conserva aunque el catering se recotice. Los cobros por importe no se convierten a PAX.`, 10);
+  row(pax, source, 3, 42, [null, "Destino", "Categoría", "Contratados", "Cubiertos", "Por acreditar", "Pendientes", "Excedente", "Saldo PAX ARS", "Precio vigente ARS"], 10);
+  r = 4;
+  for (const c of ingresos.coberturas) for (const t of c.tarifas) {
+    row(pax, source, r, 43, [null, c.label, nombreCategoria(t.categoria ?? ""), t.pax, t.cubiertos, t.por_acreditar, t.pendientes, t.excedente, t.saldo_categoria, t.precio_aplicado], 10);
+    for (let col = 4; col <= 8; col++) pax.getCell(r, col).numFmt = "0";
+    r++;
+  }
+  band(pax, source, r++, "COBERTURA HISTÓRICA POR COBRO", 10);
+  row(pax, source, r++, 42, ["Cobro", "Destino", "Categoría", "PAX originales", "Reasignados", "PAX vigentes", "Precio aplicado ARS", "Importe histórico ARS", "Importe vigente ARS", "Estado"], 10);
+  let count = 0;
+  for (const p of payments) for (const c of p.catering_coberturas) {
+    row(pax, source, r, 43, [ids.get(p.id)!, destinations.get(`catering:${c.catering_contrato_id}`) ?? "Destino no disponible",
+      nombreCategoria(c.categoria), c.cantidad, c.liberada, c.cantidad - c.liberada, c.precio_aplicado, c.importe_historico,
+      roundMoney((c.cantidad - c.liberada) * c.precio_aplicado), pending(p) ? "Por acreditar" : "Acreditado"], 10);
+    for (const col of [1, 4, 5, 6]) pax.getCell(r, col).numFmt = "0";
+    r++; count++;
+  }
+  if (!count) note(pax, source, r++, "Sin coberturas históricas registradas.", 10);
+  pax.views = [{ state: "frozen", ySplit: 3, showGridLines: false }];
+  finish(pax, r - 1, 10);
+  for (const output of [sheet, allocations, pax]) {
+    if (output.columnCount > 7) output.pageSetup.paperSize = 8 as ExcelJS.PaperSize; // ExcelJS's enum omits A3.
+    output.eachRow((line) => {
+      const heading = line.getCell(1).value === "Cobro" || (output === pax && line.number === 3);
+      const summary = line.getCell(1).isMerged;
+      line.eachCell({ includeEmpty: true }, (c) => {
+        c.font = { name: "Arial", size: 11, bold: summary ? c.font?.bold : heading };
+        if (heading) c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9D9D9" } };
+        if (!summary) c.border = { bottom: { style: "thin", color: { argb: "FFD9D9D9" } } };
+      });
+    });
+  }
+}
+
 export async function buildCommercialWorkbook(data: CommercialExportData) {
   const template = new ExcelJS.Workbook();
-  await template.xlsx.readFile(path.join(process.cwd(), "resources", "commercial-excel", `${data.kind}.xlsx`));
+  await template.xlsx.readFile(path.join(process.cwd(), "resources", "commercial-excel", `${data.kind === "pagos" ? "evento" : data.kind}.xlsx`));
   const book = new ExcelJS.Workbook();
   book.creator = "Software Eventos";
   book.lastModifiedBy = "Software Eventos";
   book.created = new Date(); book.modified = new Date();
   book.calcProperties.fullCalcOnLoad = true;
-  if (data.kind === "evento") eventWorkbook(book, template, data);
+  if (data.kind === "pagos") paymentHistoryWorkbook(book, template, data);
+  else if (data.kind === "evento") eventWorkbook(book, template, data);
   else cateringWorkbook(book, template, data);
   return book;
 }
 
-export function exportFilename(kind: "evento" | "catering", id: string, now = new Date()) {
+export function exportFilename(kind: "evento" | "catering" | "pagos", id: string, now = new Date()) {
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
   return `${kind}-${id.replace(/[^a-zA-Z0-9-]/g, "").slice(0, 64)}-${day}.xlsx`;
 }

@@ -168,6 +168,13 @@ The command replaces the type file only after successful generation.
 
 ## Focused Payment Verification
 
+In **Eventos → Ingresos**, **Descargar detalle de pagos** exports the complete
+active payment history as an email-ready XLSX, with separate guarantees,
+destination allocations, historical USD amounts and catering PAX coverage.
+See [payment history export and manual release checks](docs/detalle-pagos-excel.md).
+Run `pnpm test:detalle-pagos:db` for the combined fictional-data scenario in an
+isolated PostgreSQL cluster. This feature requires no new migration.
+
 See [verification findings and application procedure](docs/verificacion-bloqueos.md)
 before applying the payment/security migration. The reference schema is not a
 replacement for the live database, and this checkout lacks the historical baseline

@@ -5,7 +5,7 @@ import { loadCommercialExport } from "./data";
 import { ExportError } from "./types";
 import { buildCommercialWorkbook, exportFilename } from "./workbook";
 
-export async function commercialExportResponse(kind: "evento" | "catering", id: string) {
+export async function commercialExportResponse(kind: "evento" | "catering" | "pagos", id: string) {
   const headers = { "Cache-Control": "private, no-store, max-age=0", "Vary": "Cookie", "X-Content-Type-Options": "nosniff" };
   try {
     const data = await loadCommercialExport(await createClient(), kind, id);

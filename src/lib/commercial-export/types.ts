@@ -1,4 +1,5 @@
 import type { Tables } from "../../types/database.types";
+import type { EventoIngresos } from "../pagos/ingresos-data";
 
 export type ExportPayment = Omit<Pick<Tables<"pagos">,
   | "id" | "evento_id" | "evento_servicio_id" | "catering_contrato_id"
@@ -45,7 +46,13 @@ export type CateringExportData = CateringSummary & {
   tarifas: Tables<"v_catering_tarifas">[];
   coberturas: Tables<"catering_coberturas">[];
 };
-export type CommercialExportData = EventExportData | CateringExportData;
+export type PaymentHistoryExportData = {
+  kind: "pagos";
+  event: ExportEvent;
+  ingresos: EventoIngresos;
+  servicios: { id: string; servicios_catalogo: { nombre: string } | null }[];
+};
+export type CommercialExportData = EventExportData | CateringExportData | PaymentHistoryExportData;
 
 export class ExportError extends Error {
   constructor(public status: number, message: string) { super(message); }

@@ -15,7 +15,8 @@ const balances = process.argv.includes("--balances");
 const catering = process.argv.includes("--catering");
 const ipcCron = process.argv.includes("--ipc-cron");
 const ipc = ipcCron || process.argv.includes("--ipc");
-const cobertura = ipc || process.argv.includes("--cobertura");
+const detallePagos = process.argv.includes("--detalle-pagos");
+const cobertura = detallePagos || ipc || process.argv.includes("--cobertura");
 const imputaciones = cobertura || process.argv.includes("--imputaciones");
 const cheques = process.argv.includes("--cheques");
 const expenses = process.argv.includes("--expenses");
@@ -50,6 +51,7 @@ try {
         readFileSync("supabase/migrations/20261110215027_catering_por_personas.sql", "utf8")
           .replace(/^begin;\n|\ncommit;\n$/g, ""),
         readFileSync("supabase/tests/catering-cobertura.sql", "utf8"),
+        ...(detallePagos ? [readFileSync("supabase/tests/detalle-pagos.sql", "utf8")] : []),
         readFileSync("supabase/verification/postflight-catering-por-personas.sql", "utf8"),
       ] : []),
       ...(ipc ? [

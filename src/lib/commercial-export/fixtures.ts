@@ -1,7 +1,36 @@
 import type { Tables } from "../../types/database.types";
-import type { CateringExportData, EventExportData, ExportCatering, ExportEvent, ExportPayment, ExportService } from "./types";
+import type { CateringExportData, EventExportData, ExportCatering, ExportEvent, ExportPayment, ExportService, PaymentHistoryExportData } from "./types";
+import { calculatePaymentSummary, getArgentinaPaymentDay } from "../pagos/calculos";
 
 export const fixtureId = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+
+export function examplePaymentHistory(): PaymentHistoryExportData {
+  const event = exampleEvent(0).event;
+  const raw = [
+    { ...examplePayment(2), importe_moneda_original: 2, tipo_cambio: 1000, importe_en_pesos: 2000, evento_servicio_id: null },
+    { ...examplePayment(3, null, fixtureId(30)), forma_pago: "cheque" as const, moneda: "ARS" as const,
+      fecha_pago: "2099-01-01", importe_moneda_original: 900, importe_en_pesos: 900, tipo_cambio: 1, banco: "Banco ficticio", numero_cheque: "0000123" },
+    { ...examplePayment(5, null, fixtureId(30)), importe_moneda_original: 1000, importe_en_pesos: 1000 },
+    { ...examplePayment(7), importe_moneda_original: 300, importe_en_pesos: 300 },
+  ];
+  const pagos = raw.map((p, i) => ({ ...p, registrado_por: fixtureId(99),
+    pago_imputaciones: i === 0 ? [
+      { evento_servicio_id: fixtureId(2), catering_contrato_id: null, importe_ars: 1200 },
+      { evento_servicio_id: null, catering_contrato_id: fixtureId(30), importe_ars: 800 },
+    ] : [],
+    catering_coberturas: i === 2 || i === 1 ? [{ pago_id: p.id, catering_contrato_id: fixtureId(30), categoria: "adultos",
+      cantidad: i === 2 ? 2 : 1, liberada: 0, precio_aplicado: i === 2 ? 500 : 900, importe_historico: i === 2 ? 1000 : 900 }] : [],
+  }));
+  const summary = calculatePaymentSummary({ payments: pagos, total: 13600, saldo: 9800 });
+  return { kind: "pagos", event, servicios: [{ id: fixtureId(2), servicios_catalogo: { nombre: "Salón ficticio" } }],
+    ingresos: { ...summary, pagos, ajusteCobertura: -800, fechaSaldo: getArgentinaPaymentDay(),
+      cateringDestinos: [{ value: `catering:${fixtureId(30)}`, label: "Catering · Menú ficticio", saldoPendiente: 1000 }],
+      coberturas: [{ id: fixtureId(30), label: "Catering · Menú ficticio", tarifas: [{ categoria: "adultos", catering_contrato_id: fixtureId(30),
+        evento_id: event.id, pax: 4, cubiertos: 2, por_acreditar: 1, pendientes: 2, excedente: 0, saldo_categoria: 1800, precio_aplicado: 900,
+        precio_base: 900, adicional_unitario: 0, cobertura_ars: 1000, tarifas_historicas: 1 }] }],
+    },
+  };
+}
 export function examplePayment(n: number, serviceId: string | null = fixtureId(2), contractId: string | null = null): ExportPayment {
   const usd = n % 2 === 0;
   const transfer = n % 3 === 0;

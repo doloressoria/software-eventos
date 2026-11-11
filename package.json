@@ -20,6 +20,7 @@
     "test:imputaciones:db": "node scripts/test-payments-db.mjs --imputaciones",
     "test:cheques:db": "node scripts/test-payments-db.mjs --cheques",
     "test:cobertura:db": "node scripts/test-payments-db.mjs --cobertura",
+    "test:detalle-pagos:db": "node scripts/test-payments-db.mjs --detalle-pagos",
     "test:catering:db": "node scripts/test-payments-db.mjs --catering",
     "test:egresos:db": "node scripts/test-payments-db.mjs --expenses",
     "excel:examples": "node scripts/commercial-excel-examples.mjs",

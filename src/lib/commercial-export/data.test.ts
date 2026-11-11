@@ -3,7 +3,7 @@ import test from "node:test";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../../types/database.types";
 import { allRows, loadCommercialExport } from "./data";
-import { exampleCatering, exampleEvent, fixtureId } from "./fixtures";
+import { exampleCatering, exampleEvent, examplePaymentHistory, fixtureId } from "./fixtures";
 import { ExportError } from "./types";
 
 function database({ screens = ["eventos", "catering"], active = true, authenticated = true, denied = "", failure = "" }: {
@@ -13,12 +13,16 @@ function database({ screens = ["eventos", "catering"], active = true, authentica
   const catering = exampleCatering();
   const reads: string[] = [];
   const selections: string[] = [];
+  const history = examplePaymentHistory();
   const rows: Record<string, object[]> = {
     usuarios: [{ id: fixtureId(99), rol: "vendedor", activo: active }], eventos: [event.event],
     v_evento_servicios_acreditados: event.services, v_pago_imputaciones: [...event.payments, ...catering.payments.map((p) => ({ ...p, id: `contract-${p.id}` }))],
     v_catering_acreditado: [catering.catering], catering_items: catering.items, catering_precio_historial: catering.history,
     v_catering_costos: [catering.costos], v_catering_tarifas: catering.tarifas, catering_coberturas: catering.coberturas,
     evento_contactos: event.contacts.map((c) => ({ ...c, evento_id: event.event.id, deleted_at: null })), actualizaciones_ipc: event.updates,
+    pagos: history.ingresos.pagos,
+    evento_servicios: history.servicios.map((s) => ({ ...s, evento_id: event.event.id })),
+    v_resumen_evento: [{ id: event.event.id, total_servicios: 10000, total_catering: 3600, ajuste_cobertura_catering: -800 }],
   };
   const client = {
     auth: { getUser: async () => ({ data: { user: authenticated ? { id: fixtureId(99) } : null }, error: null }) },
@@ -40,8 +44,51 @@ function database({ screens = ["eventos", "catering"], active = true, authentica
       return chain;
     },
   } as unknown as SupabaseClient<Database>;
-  return { client, reads, selections, event, catering };
+  return { client, reads, selections, event, catering, rows };
 }
+
+test("historial de Ingresos admite lectura de eventos sin permiso de gestión ni catering", async () => {
+  const db = database({ screens: ["eventos"] });
+  const data = await loadCommercialExport(db.client, "pagos", fixtureId(1));
+  assert.equal(data.kind, "pagos");
+  if (data.kind !== "pagos") return;
+  assert.equal(data.ingresos.pagos.length, 4);
+  assert.equal(data.ingresos.totalCobrado, 3000);
+  assert.equal(data.ingresos.saldoPendiente, 9800);
+  assert.equal(data.ingresos.ajusteCobertura, -800);
+  assert.ok(db.reads.includes("pagos"));
+  assert.ok(!db.reads.includes("v_pago_imputaciones"));
+  assert.ok(!db.reads.includes("evento_contactos"));
+});
+
+test("historial completo pagina cabeceras y omite bajas y otros eventos", async () => {
+  const db = database();
+  const base = examplePaymentHistory().ingresos.pagos[2];
+  db.rows.pagos = Array.from({ length: 1003 }, (_, i) => ({ ...base, id: fixtureId(1000 + i), catering_coberturas: [] }));
+  db.rows.pagos.push({ ...base, id: fixtureId(3000), deleted_at: "2026-10-01" },
+    { ...base, id: fixtureId(3001), evento_id: fixtureId(9) });
+  const data = await loadCommercialExport(db.client, "pagos", fixtureId(1));
+  assert.equal(data.kind, "pagos");
+  if (data.kind !== "pagos") return;
+  assert.equal(data.ingresos.pagos.length, 1003);
+  assert.equal(data.ingresos.totalCobrado, 1003000);
+});
+
+test("historial denegado por sesión, rol o evento/salón RLS no lee los cobros", async () => {
+  for (const [options, id, status] of [
+    [{ authenticated: false }, fixtureId(1), 401], [{ active: false }, fixtureId(1), 403],
+    [{ screens: ["catering"] }, fixtureId(1), 403], [{ denied: "eventos" }, fixtureId(1), 404],
+    [{}, "invalid", 400], [{}, fixtureId(9), 404],
+  ] as const) {
+    const db = database(options);
+    await assert.rejects(loadCommercialExport(db.client, "pagos", id), (e: unknown) => e instanceof ExportError && e.status === status);
+    assert.ok(!db.reads.includes("pagos"));
+  }
+  for (const failure of ["pagos", "v_resumen_evento", "v_catering_tarifas", "evento_servicios"]) {
+    const db = database({ failure });
+    await assert.rejects(loadCommercialExport(db.client, "pagos", fixtureId(1)), ExportError);
+  }
+});
 
 test("exportar evento sin permiso catering no consulta contratos ni el resumen general", async () => {
   const db = database({ screens: ["eventos"] });

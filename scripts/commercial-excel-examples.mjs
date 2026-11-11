@@ -10,11 +10,12 @@ try {
   execFileSync("pnpm", ["exec", "tsc", "--outDir", build, "--noEmit", "false", "--module", "commonjs", "--target", "es2022", "--lib", "es2022,dom", "--skipLibCheck", "--esModuleInterop",
     "src/lib/commercial-export/fixtures.ts", "src/lib/commercial-export/workbook.ts"], { stdio: "inherit" });
   const { buildCommercialWorkbook } = require(path.resolve(build, "lib/commercial-export/workbook.js"));
-  const { exampleEvent, exampleCatering } = require(path.resolve(build, "lib/commercial-export/fixtures.js"));
+  const { exampleEvent, exampleCatering, examplePaymentHistory } = require(path.resolve(build, "lib/commercial-export/fixtures.js"));
   const event = exampleEvent();
   const linked = exampleCatering();
   event.caterings = [{ catering: linked.catering, payments: linked.payments }];
   const cases = [
+    ["detalle-pagos", examplePaymentHistory()],
     ["evento", event], ["catering-asociado", linked],
     ["catering-externo-sin-pagos", exampleCatering({ linked: false, paymentCount: 0 })],
     ["catering-diferencia-y-muchos-registros", exampleCatering({ mismatch: true, paymentCount: 35, itemCount: 18 })],

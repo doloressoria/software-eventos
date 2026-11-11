@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ExportExcelButton, ExportExcelScope } from "@/components/commercial-export";
 import { EventoDetalleNav } from "@/components/eventos/evento-detalle-nav";
 import { IngresosEventoSection } from "@/components/pagos/ingresos-evento-section";
 import { buttonVariants } from "@/components/ui/button";
@@ -26,13 +27,14 @@ export default async function EventoIngresosPage({
   ]);
 
   return (
-    <section className="space-y-6">
+    <ExportExcelScope className="space-y-6">
       <PageHeader
         eyebrow="Ingresos"
         title={evento.cliente_nombre}
         description="Cobros registrados para este evento, saldo pendiente y carga de nuevos pagos."
         actions={
           <>
+            <ExportExcelButton kind="pagos" id={evento.id} />
             <Link
               href={`/eventos/${evento.id}`}
               className={buttonVariants({ variant: "secondary" })}
@@ -59,6 +61,6 @@ export default async function EventoIngresosPage({
         admin={profile.rol === "admin"}
         gestionaEventos={canUseScreen(permisos, "eventos", true)}
       />
-    </section>
+    </ExportExcelScope>
   );
 }

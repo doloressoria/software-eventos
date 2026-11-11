@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useId, useState } from "react";
+import { useActionState, useId, useState, useRef } from "react";
+import { useExportForm } from "@/components/commercial-export";
 import type { DeletePagoState } from "@/app/(protected)/pagos/actions";
 import { SubmitButton } from "@/components/salones/submit-button";
 import { FormAlert, Input, Label } from "@/components/ui/form";
@@ -13,13 +14,15 @@ export function ReasignarExcedenteForm({ action, destinos, maximo, precio }: {
   maximo: number;
   precio: number;
 }) {
-  const [state, formAction] = useActionState(action, {});
+  const [state, formAction, pending] = useActionState(action, {});
+  const formRef = useRef<HTMLFormElement>(null);
+  useExportForm(formRef, pending, !state.formError, state);
   const [cantidad, setCantidad] = useState(String(maximo));
   const id = useId();
   const importe = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(Number(cantidad) * precio);
   return <details className="mt-2 rounded-md border p-2">
     <summary className="cursor-pointer text-sm font-medium">Reasignar excedente</summary>
-    <form action={formAction} className="mt-2 min-w-56 space-y-3">
+    <form ref={formRef} action={formAction} className="mt-2 min-w-56 space-y-3">
       <div>
         <Label htmlFor={`${id}-cantidad`}>Personas a liberar (hasta {maximo})</Label>
         <Input id={`${id}-cantidad`} name="cantidad" type="number" min={1} max={maximo} step={1} required value={cantidad}

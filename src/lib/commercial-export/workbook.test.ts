@@ -4,7 +4,74 @@ import ExcelJS from "exceljs";
 import * as XLSX from "xlsx";
 import { buildCommercialWorkbook, exportFilename } from "./workbook";
 import { cateringAmounts, PARTIAL_NOTICE, SEPARATE_NOTICE } from "./calculations";
-import { exampleCatering, exampleEvent, examplePayment, fixtureId } from "./fixtures";
+import { exampleCatering, exampleEvent, examplePayment, examplePaymentHistory, fixtureId } from "./fixtures";
+
+test("PAGOS concilia USD, cheque pendiente, reparto y catering recotizado con Ingresos", async () => {
+  const data = examplePaymentHistory();
+  const book = await buildCommercialWorkbook(data);
+  assert.deepEqual(book.worksheets.map((s) => s.name), ["PAGOS", "IMPUTACIONES", "PAX"]);
+  assert.equal(amount(book, "PAGOS", "Total a precios vigentes (ARS)", 12), 13600);
+  assert.equal(amount(book, "PAGOS", "Ajuste por cobertura histórica de catering (ARS)", 12), -800);
+  assert.equal(amount(book, "PAGOS", "Ingresos ordinarios acreditados (ARS)", 12), 3000);
+  assert.equal(amount(book, "PAGOS", "Saldo pendiente (ARS)", 12), 9800);
+  assert.equal(amount(book, "PAGOS", "Cheques ordinarios pendientes de acreditación (ARS)", 12), 900);
+  assert.equal(amount(book, "PAGOS", "Garantías registradas (ARS)", 12), 300);
+  const rows: ExcelJS.CellValue[][] = [];
+  book.getWorksheet("PAGOS")!.eachRow((r) => { if (typeof r.getCell(1).value === "number") rows.push(r.values as ExcelJS.CellValue[]); });
+  assert.equal(rows.length, 4, "una sola fila por cabecera, incluidas las garantías");
+  const usd = rows.find((r) => r[6] === "USD")!;
+  assert.equal(usd[7], 1000);
+  assert.equal(usd[8], 2);
+  assert.equal(usd[9], 2000);
+  const cheque = rows.find((r) => r[5] === "Cheque")!;
+  assert.equal(cheque[10], "Pendiente");
+  assert.equal(cheque[12], "0000123");
+  assert.equal(book.getWorksheet("IMPUTACIONES")!.getCell("C4").value, 1200);
+  assert.equal(book.getWorksheet("IMPUTACIONES")!.getCell("C5").value, 800);
+  const pax = book.getWorksheet("PAX")!;
+  assert.equal(pax.getCell("E4").value, 2);
+  assert.equal(pax.getCell("F4").value, 1);
+  assert.equal(pax.getCell("J4").value, 900);
+  const historical: ExcelJS.CellValue[][] = [];
+  pax.eachRow((r) => { if (r.getCell(1).value === 3) historical.push(r.values as ExcelJS.CellValue[]); });
+  assert.equal(historical[0][7], 500, "se conserva la tarifa de la cobertura histórica");
+  assert.equal(historical[0][8], 1000);
+  const read = XLSX.read(await book.xlsx.writeBuffer(), { type: "buffer", cellDates: true });
+  assert.equal(read.Sheets.PAGOS.B3.t, "d");
+  assert.equal(read.Sheets.PAGOS.D3.t, "d");
+  assert.ok(!texts(book).some((t) => /monto (bruto|neto)|morales|delfina|español/i.test(t)));
+  assert.ok(!texts(book).some((t) => /#REF!|#VALUE!|#DIV\/0!/.test(t)));
+  const reopened = new ExcelJS.Workbook();
+  await reopened.xlsx.load(await book.xlsx.writeBuffer());
+  assert.equal(amount(reopened, "PAGOS", "Saldo pendiente (ARS)", 12), data.ingresos.saldoPendiente);
+});
+
+test("historial vacío, USD sin equivalente, PAX reasignados y texto literal", async () => {
+  const data = examplePaymentHistory();
+  data.ingresos.pagos[0].importe_en_pesos = null;
+  data.ingresos.pagos[0].tipo_cambio = null;
+  data.ingresos.pagos[0].concepto = '=HYPERLINK("https://example.invalid")';
+  data.ingresos.pagos[2].catering_coberturas[0].liberada = 1;
+  const book = await buildCommercialWorkbook(data);
+  assert.ok(texts(book).some((t) => t.startsWith("Hay cobros sin equivalente histórico")));
+  const literal = Object.values(XLSX.read(await book.xlsx.writeBuffer(), { type: "buffer" }).Sheets.PAGOS)
+    .find((c) => typeof c === "object" && "v" in c && c.v === data.ingresos.pagos[0].concepto)!;
+  assert.equal(literal.t, "s");
+  assert.equal(literal.f, undefined);
+  const pax = book.getWorksheet("PAX")!;
+  let checked = false;
+  pax.eachRow((r) => { if (r.getCell(1).value === 3) {
+    assert.equal(r.getCell(5).value, 1);
+    assert.equal(r.getCell(6).value, 1);
+    assert.equal(r.getCell(9).value, 500);
+    checked = true;
+  } });
+  assert.ok(checked);
+  data.ingresos.pagos = [];
+  data.ingresos.coberturas = [];
+  const empty = await buildCommercialWorkbook(data);
+  for (const t of ["Sin cobros ordinarios registrados.", "Sin garantías registradas.", "Sin imputaciones registradas.", "Sin coberturas históricas registradas."]) assert.ok(texts(empty).includes(t));
+});
 
 function texts(book: ExcelJS.Workbook) {
   const result: string[] = [];

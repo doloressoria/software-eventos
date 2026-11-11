@@ -1,3 +1,5 @@
+import { allRows } from "./rows";
+import { loadEventoIngresos } from "../pagos/ingresos-data";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../../types/database.types";
 import { ExportError, type CommercialExportData, type ExportCatering, type ExportEvent, type ExportPayment, type ExportService } from "./types";
@@ -7,21 +9,9 @@ type Screen = "eventos" | "catering";
 const paymentColumns = "id, pago_id, evento_id, evento_servicio_id, catering_contrato_id, concepto, created_at, fecha_pago, forma_pago, moneda, banco, numero_cheque, importe_moneda_original, tipo_cambio, importe_en_pesos, es_garantia, deleted_at, notas";
 const cateringColumns = "*, usuarios!catering_contratos_ejecutiva_id_fkey(full_name,email), salones(nombre)";
 
-// Rebuild each page query: PostgREST's response limit must never truncate an export.
-export async function allRows<T>(page: (start: number, end: number) => PromiseLike<{
-  data: T[] | null; error: unknown;
-}>, size = 500): Promise<T[]> {
-  const rows: T[] = [];
-  for (let start = 0; ;) {
-    const result = await page(start, start + size - 1);
-    if (result.error || !result.data) throw new ExportError(500, "No se pudieron leer todos los datos para la exportación. Intentá nuevamente.");
-    rows.push(...result.data);
-    if (result.data.length === 0) return rows;
-    start += result.data.length;
-  }
-}
+export { allRows } from "./rows";
 
-export async function loadCommercialExport(client: Client, kind: "evento" | "catering", id: string): Promise<CommercialExportData> {
+export async function loadCommercialExport(client: Client, kind: "evento" | "catering" | "pagos", id: string): Promise<CommercialExportData> {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
     throw new ExportError(400, "El identificador no es válido.");
   }
@@ -33,7 +23,7 @@ export async function loadCommercialExport(client: Client, kind: "evento" | "cat
   const permissions = profile.rol === "admin" ? null : await client.rpc("current_user_permissions");
   if (permissions?.error) throw new ExportError(500, "No se pudieron comprobar tus permisos.");
   const allowed = (screen: Screen) => profile.rol === "admin" || Boolean(permissions?.data?.some((p) => p.screen === screen));
-  if (!allowed(kind === "evento" ? "eventos" : "catering")) {
+  if (!allowed(kind === "catering" ? "catering" : "eventos")) {
     throw new ExportError(403, "No tenés permiso para exportar este detalle.");
   }
 
@@ -49,6 +39,16 @@ export async function loadCommercialExport(client: Client, kind: "evento" | "cat
   const cateringPayments = (contract: ExportCatering) => allRows((start, end) => client.from("v_pago_imputaciones").select(paymentColumns)
     .eq("catering_contrato_id", contract.id).is("deleted_at", null).order("fecha_pago").order("id").range(start, end))
     .then((rows) => rows.filter((p) => p.evento_id === contract.evento_id && p.evento_servicio_id === null) as ExportPayment[]);
+
+  if (kind === "pagos") {
+    const event = (await eventById(id, true))!;
+    const [ingresos, servicios] = await Promise.all([
+      loadEventoIngresos(client, id),
+      allRows((start, end) => client.from("evento_servicios").select("id,servicios_catalogo(nombre)")
+        .eq("evento_id", id).order("id").range(start, end)),
+    ]);
+    return { kind, event, ingresos, servicios };
+  }
 
   if (kind === "evento") {
     const event = (await eventById(id, true))!;

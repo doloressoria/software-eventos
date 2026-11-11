@@ -56,3 +56,37 @@ test("exportación espera la sincronización de selects y conserva la detección
   assert.equal(scope.hasChanges(), false);
   assert.equal(frames.size, 0, "el desmontaje cancela el frame pendiente");
 });
+
+test("botón de historial descarga la ruta del evento y respeta borradores y guardados", async () => {
+  for (const scenario of ["download", "saving", "cancel"] as const) {
+    const requests: string[] = [];
+    let clicks = 0;
+    const errors: unknown[] = [];
+    const exports: Record<string, (props: unknown) => { props: { children: { props: { children: string; onClick: () => Promise<void> } }[] } }> = {};
+    runInNewContext(ts.transpileModule(readFileSync("src/components/commercial-export.tsx", "utf8"), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
+    }).outputText, {
+      exports, setTimeout: () => 1, encodeURIComponent,
+      window: { confirm: () => false },
+      URL: { createObjectURL: () => "blob:test", revokeObjectURL: () => {} },
+      document: { createElement: () => ({ click: () => { clicks++; }, remove: () => {} }), body: { appendChild: () => {} } },
+      fetch: async (url: string) => { requests.push(url); return {
+        ok: true, redirected: false, blob: async () => ({}),
+        headers: { get: (name: string) => name === "content-type" ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : 'attachment; filename="pagos-demo.xlsx"' },
+      }; },
+      require: (name: string) => {
+        if (name === "react") return { createContext: () => ({}), useState: (v: unknown) => [v, (n: unknown) => { errors.push(n); }],
+          useContext: () => ({ isSaving: () => scenario === "saving", hasChanges: () => scenario === "cancel", pending: false }) };
+        if (name === "react/jsx-runtime") return { jsx: (type: unknown, props: unknown) => ({ type, props }), jsxs: (type: unknown, props: unknown) => ({ type, props }) };
+        if (name === "@/components/ui/button") return { buttonVariants: () => "button" };
+        assert.equal(name, "@/components/ui/alert"); return {};
+      },
+    });
+    const button = exports.ExportExcelButton({ kind: "pagos", id: "event-id" }).props.children[0].props;
+    assert.equal(button.children, "Descargar detalle de pagos");
+    await button.onClick();
+    assert.equal(clicks, scenario === "download" ? 1 : 0);
+    assert.deepEqual(requests, scenario === "download" ? ["/eventos/event-id/ingresos/excel"] : []);
+    if (scenario === "saving") assert.ok(errors.some((e) => typeof e === "string" && e.includes("guardado")));
+  }
+});

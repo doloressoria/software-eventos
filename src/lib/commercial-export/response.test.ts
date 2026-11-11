@@ -4,7 +4,7 @@ import { runInNewContext } from "node:vm";
 import test from "node:test";
 import ts from "typescript";
 import * as XLSX from "xlsx";
-import { exampleCatering } from "./fixtures";
+import { exampleCatering, examplePaymentHistory } from "./fixtures";
 import { ExportError } from "./types";
 import { buildCommercialWorkbook, exportFilename } from "./workbook";
 import { getDefaultScreenPath, getRequiredScreenPermission } from "../roles/permissions";
@@ -49,21 +49,44 @@ test("errores preservan status y mensaje sin revelar detalles de la base", async
   }
 });
 
+test("descarga del historial entrega un XLSX adjuntable con nombre seguro y saldo", async () => {
+  const data = examplePaymentHistory();
+  const loaded = load("src/lib/commercial-export/response.ts", {
+    "server-only": {}, "@/lib/supabase/server": { createClient: async () => ({}) },
+    "./data": { loadCommercialExport: async (_client: unknown, kind: string, id: string) => {
+      assert.equal(kind, "pagos"); assert.equal(id, data.event.id); return data;
+    } }, "./types": { ExportError }, "./workbook": { buildCommercialWorkbook, exportFilename },
+  });
+  const route = load("src/app/(protected)/eventos/[id]/ingresos/excel/route.ts", {
+    "@/lib/commercial-export/response": loaded,
+  });
+  const response = await route.GET(new Request("https://example.invalid"), { params: Promise.resolve({ id: data.event.id }) });
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("cache-control")!, /private, no-store/);
+  assert.equal(response.headers.get("vary"), "Cookie");
+  assert.match(response.headers.get("content-disposition")!, /attachment; filename="pagos-[a-zA-Z0-9.-]+\.xlsx"/);
+  assert.match(response.headers.get("content-type")!, /spreadsheetml/);
+  const book = XLSX.read(await response.arrayBuffer(), { type: "array" });
+  assert.equal(book.Sheets.PAGOS.L7.v, 9800);
+});
+
 test("proxy devuelve JSON 401/403 en las descargas y conserva las cookies de sesión", async () => {
+  for (const pathname of ["/catering/00000000-0000-4000-8000-000000000030/excel", "/eventos/00000000-0000-4000-8000-000000000001/ingresos/excel"]) {
   for (const scenario of ["expired", "inactive", "wrong-screen"] as const) {
     let writtenCookies = 0;
     const loaded = load("src/proxy.ts", {
       "@/lib/supabase/middleware": { updateSession: async () => ({
         claims: scenario === "expired" ? null : { sub: "test-user" }, accessDenied: scenario === "inactive", isAdmin: false,
-        permissions: [{ screen: "eventos", can_manage: false }], response: { cookies: { getAll: () => [{ name: "session", value: "refreshed" }] } },
+        permissions: [{ screen: pathname.startsWith("/eventos/") ? "catering" : "eventos", can_manage: false }], response: { cookies: { getAll: () => [{ name: "session", value: "refreshed" }] } },
       }) },
       "@/lib/roles/permissions": { getDefaultScreenPath, getRequiredScreenPermission },
       "next/server": { NextResponse: { json: (body: unknown, options: ResponseInit) => Object.assign(Response.json(body, options), { cookies: { set(name: string) { assert.equal(name, "session"); writtenCookies++; } } }) } },
     });
-    const response = await loaded.proxy({ nextUrl: { pathname: "/catering/00000000-0000-4000-8000-000000000030/excel" } });
+    const response = await loaded.proxy({ nextUrl: { pathname } });
     assert.equal(response.status, scenario === "expired" ? 401 : 403);
     assert.match(response.headers.get("content-type")!, /application\/json/);
     assert.match(response.headers.get("cache-control")!, /no-store/);
     assert.equal(writtenCookies, 1);
+  }
   }
 });
