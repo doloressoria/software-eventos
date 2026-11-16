@@ -134,48 +134,6 @@ export type Database = {
           },
         ]
       }
-      catering_cobro_componentes: {
-        Row: {
-          pago_id: string
-          catering_contrato_id: string
-          version_calculo: number
-          explicito: boolean
-          objetivo_ars: number
-          capital_ars: number | null
-          iva_ars: number | null
-          ajuste_ars: number
-          ajuste_iva_ars: number
-          capital_reasignado_ars: number
-        }
-        Insert: {
-          pago_id: string
-          catering_contrato_id: string
-          version_calculo: number
-          explicito?: boolean
-          objetivo_ars: number
-          capital_ars?: number | null
-          iva_ars?: number | null
-          ajuste_ars?: number
-          ajuste_iva_ars?: number
-          capital_reasignado_ars?: number
-        }
-        Update: {
-          pago_id?: string
-          catering_contrato_id?: string
-          version_calculo?: number
-          explicito?: boolean
-          objetivo_ars?: number
-          capital_ars?: number | null
-          iva_ars?: number | null
-          ajuste_ars?: number
-          ajuste_iva_ars?: number
-          capital_reasignado_ars?: number
-        }
-        Relationships: [
-          { foreignKeyName: "catering_cobro_componentes_pago_id_fkey"; columns: ["pago_id"]; isOneToOne: false; referencedRelation: "pagos"; referencedColumns: ["id"] },
-          { foreignKeyName: "catering_cobro_componentes_catering_contrato_id_fkey"; columns: ["catering_contrato_id"]; isOneToOne: false; referencedRelation: "catering_contratos"; referencedColumns: ["id"] }
-        ]
-      }
       catering_coberturas: {
         Row: {
           cantidad: number
@@ -242,6 +200,81 @@ export type Database = {
           },
         ]
       }
+      catering_cobro_componentes: {
+        Row: {
+          ajuste_ars: number
+          ajuste_iva_ars: number
+          capital_ars: number | null
+          capital_reasignado_ars: number
+          catering_contrato_id: string
+          explicito: boolean
+          iva_ars: number | null
+          objetivo_ars: number
+          pago_id: string
+          version_calculo: number
+        }
+        Insert: {
+          ajuste_ars?: number
+          ajuste_iva_ars?: number
+          capital_ars?: number | null
+          capital_reasignado_ars?: number
+          catering_contrato_id: string
+          explicito?: boolean
+          iva_ars?: number | null
+          objetivo_ars: number
+          pago_id: string
+          version_calculo: number
+        }
+        Update: {
+          ajuste_ars?: number
+          ajuste_iva_ars?: number
+          capital_ars?: number | null
+          capital_reasignado_ars?: number
+          catering_contrato_id?: string
+          explicito?: boolean
+          iva_ars?: number | null
+          objetivo_ars?: number
+          pago_id?: string
+          version_calculo?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catering_cobro_componentes_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "catering_contratos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catering_cobro_componentes_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "v_catering_acreditado"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catering_cobro_componentes_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "v_catering_costos"
+            referencedColumns: ["catering_contrato_id"]
+          },
+          {
+            foreignKeyName: "catering_cobro_componentes_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "v_catering_tarifas"
+            referencedColumns: ["catering_contrato_id"]
+          },
+          {
+            foreignKeyName: "catering_cobro_componentes_pago_id_fkey"
+            columns: ["pago_id"]
+            isOneToOne: false
+            referencedRelation: "pagos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       catering_contratos: {
         Row: {
           ajuste_ipc: number
@@ -263,8 +296,6 @@ export type Database = {
           fecha_evento: string | null
           id: string
           iva_comision: number | null
-          porcentaje_facturado: number
-          version_calculo: number
           iva_porcentaje: number | null
           lugar_evento: string | null
           monto_con_factura: number | null
@@ -277,6 +308,7 @@ export type Database = {
           pax_jovenes: number | null
           pax_menores: number | null
           pax_post_postre: number | null
+          porcentaje_facturado: number
           precio_cierre_alimentos_sin_iva: number | null
           precio_cierre_bebidas_sin_iva: number | null
           saldo_pendiente: number | null
@@ -287,6 +319,7 @@ export type Database = {
           total_pagado: number | null
           total_sin_iva: number | null
           updated_at: string
+          version_calculo: number
         }
         Insert: {
           ajuste_ipc?: never
@@ -308,8 +341,6 @@ export type Database = {
           fecha_evento?: string | null
           id?: string
           iva_comision?: number | null
-          porcentaje_facturado?: number
-          version_calculo?: number
           iva_porcentaje?: number | null
           lugar_evento?: string | null
           monto_con_factura?: number | null
@@ -322,6 +353,7 @@ export type Database = {
           pax_jovenes?: number | null
           pax_menores?: number | null
           pax_post_postre?: number | null
+          porcentaje_facturado?: number
           precio_cierre_alimentos_sin_iva?: number | null
           precio_cierre_bebidas_sin_iva?: number | null
           saldo_pendiente?: never
@@ -332,6 +364,7 @@ export type Database = {
           total_pagado?: never
           total_sin_iva?: never
           updated_at?: string
+          version_calculo?: number
         }
         Update: {
           ajuste_ipc?: never
@@ -353,8 +386,6 @@ export type Database = {
           fecha_evento?: string | null
           id?: string
           iva_comision?: number | null
-          porcentaje_facturado?: number
-          version_calculo?: number
           iva_porcentaje?: number | null
           lugar_evento?: string | null
           monto_con_factura?: number | null
@@ -367,6 +398,7 @@ export type Database = {
           pax_jovenes?: number | null
           pax_menores?: number | null
           pax_post_postre?: number | null
+          porcentaje_facturado?: number
           precio_cierre_alimentos_sin_iva?: number | null
           precio_cierre_bebidas_sin_iva?: number | null
           saldo_pendiente?: never
@@ -377,6 +409,7 @@ export type Database = {
           total_pagado?: never
           total_sin_iva?: never
           updated_at?: string
+          version_calculo?: number
         }
         Relationships: [
           {
@@ -1721,20 +1754,10 @@ export type Database = {
       }
       v_catering_acreditado: {
         Row: {
-          porcentaje_facturado: number | null
-          version_calculo: number | null
-          neto_vigente: number | null
-          neto_exigible: number | null
-          base_imponible: number | null
-          iva_calculado: number | null
-          iva_exigible: number | null
-          iva_cobrado: number | null
-          iva_cancelado: number | null
-          iva_reservado: number | null
-          iva_pendiente: number | null
-          ajuste_redondeo: number | null
           ajuste_cobertura: number | null
           ajuste_ipc: number | null
+          ajuste_redondeo: number | null
+          base_imponible: number | null
           cliente_contacto: string | null
           cliente_cuit_dni: string | null
           cliente_nombre: string | null
@@ -1752,11 +1775,19 @@ export type Database = {
           factura_razon_social: string | null
           fecha_evento: string | null
           id: string | null
+          iva_calculado: number | null
+          iva_cancelado: number | null
+          iva_cobrado: number | null
           iva_comision: number | null
+          iva_exigible: number | null
+          iva_pendiente: number | null
           iva_porcentaje: number | null
+          iva_reservado: number | null
           lugar_evento: string | null
           monto_con_factura: number | null
           monto_sin_factura: number | null
+          neto_exigible: number | null
+          neto_vigente: number | null
           notas: string | null
           pax_adultos: number | null
           pax_bebes: number | null
@@ -1765,6 +1796,7 @@ export type Database = {
           pax_jovenes: number | null
           pax_menores: number | null
           pax_post_postre: number | null
+          porcentaje_facturado: number | null
           precio_cierre_alimentos_sin_iva: number | null
           precio_cierre_bebidas_sin_iva: number | null
           saldo_pendiente: number | null
@@ -1776,6 +1808,7 @@ export type Database = {
           total_pagado: number | null
           total_sin_iva: number | null
           updated_at: string | null
+          version_calculo: number | null
         }
         Relationships: [
           {
@@ -1832,7 +1865,6 @@ export type Database = {
       }
       v_catering_tarifas: {
         Row: {
-          version_calculo: number | null
           adicional_unitario: number | null
           categoria: string | null
           catering_contrato_id: string | null
@@ -1847,6 +1879,7 @@ export type Database = {
           precio_base: number | null
           saldo_categoria: number | null
           tarifas_historicas: number | null
+          version_calculo: number | null
         }
         Relationships: [
           {

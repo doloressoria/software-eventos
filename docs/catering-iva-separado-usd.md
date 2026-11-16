@@ -1,7 +1,8 @@
 # Catering: IVA parcial, capital separado y redondeo USD
 
 Implementación local del 15/11/2026, partiendo de `main` en
-`a265db73ef2b166728f4d37800240e1912212218`. Sin publicación ni escrituras remotas.
+`a265db73ef2b166728f4d37800240e1912212218`. La migración se aplicó al proyecto remoto
+el 16/11/2026; los controles de aplicación se detallan al final de este documento.
 El pedido pegado se tomó como instrucción; el documento adjunto, como diagnóstico
 que debía contrastarse con el código y el catálogo.
 
@@ -176,11 +177,13 @@ tabla de componentes, bajar versiones ni reinterpretar cobros para un rollback.
   incluyendo catering externo; auditoría: nuevos nombres/campos.
 - Tipos afectados, fixtures, pruebas TS/SQL y ejecutor PostgreSQL aislado.
 
-`pnpm supabase:types` se ejecutó y falló: Docker Desktop está apagado (socket
-`~/.docker/run/docker.sock` ausente). Se conservó el archivo completo y se
-actualizaron manualmente las definiciones nuevas; la suite coteja todas las
-columnas afectadas contra el catálogo PostgreSQL actualizado. Esto **no sustituye
-la regeneración oficial**, pendiente en un entorno Supabase disponible.
+Durante la preparación, `pnpm supabase:types` falló porque Docker Desktop estaba
+apagado (socket `~/.docker/run/docker.sock` ausente). El 16/11, después de aplicar
+la migración, se regeneró el archivo completo mediante el generador oficial del
+conector Supabase contra el proyecto remoto actualizado. Se conservaron las 31
+restricciones previas de escritura de columnas generadas/controladas por triggers
+y argumentos SQL nullable que el generador no representa. El resultado incorpora
+las relaciones reales de la tabla nueva y pasó los controles del proyecto.
 
 Evidencia de validación y límites finales en la sección siguiente.
 
@@ -195,7 +198,7 @@ Evidencia de validación y límites finales en la sección siguiente.
 | `… pnpm test:ipc:db` | 165 comprobaciones SQL + concurrencia de cobros/IPC |
 | `… pnpm test:usd:db` | 43 comprobaciones SQL |
 | `… pnpm test:catering:db` | 21 comprobaciones SQL + concurrencia de ítems/pagos |
-| `pnpm supabase:types` | Bloqueado: Docker apagado; cotejo de columnas aislado aprobado |
+| `pnpm supabase:types` | CLI local bloqueada por Docker; regeneración oficial remota completada el 16/11 |
 
 Se probaron con datos ficticios: aceptación 20M/30%/21%, primer y segundo cobro,
 sólo IVA, IVA parcial, sólo capital, 0/100% facturado, IVA cero, extras, fijo y
@@ -216,6 +219,49 @@ La prueba de navegador **no** incluye Supabase Auth/JWT ni transporte PostgREST:
 la acción temporal usa psql contra la base aislada. Las acciones reales tienen
 pruebas con el límite Supabase simulado y el SQL con roles reales. Falta la
 validación HTTP completa en staging con Auth, PostgREST, migración y tipos
-regenerados. No se validó carga productiva ni se hizo deploy. Los controles
-manuales de preflight/postflight y advisors deben ejecutarse al aplicar en el
-entorno elegido; no se afirma haberlos ejecutado allí.
+regenerados. No se validó carga productiva ni se ejecutaron cobros de prueba en
+producción. La aplicación y los controles remotos del 16/11 se registran abajo.
+
+
+## Aplicación remota confirmada — 16/11/2026
+
+Autorizada expresamente por el usuario y ejecutada mediante el conector Supabase
+en **software-eventos-db** (`juxczmoqsiumphjwhhbc`). El SQL aplicado corresponde al
+archivo versionado en `main`, commit `25696b18`, sin modificar migraciones previas.
+Se aplicó sólo esta migración, sin `db push/reset` global ni datos ficticios remotos.
+
+Antes de aplicar se guardaron definiciones de 12 funciones, cinco vistas y los
+triggers afectados, además de inventario y huellas de los datos. Se compararon
+las huellas después: contratos (excluyendo las dos columnas nuevas), saldos de
+la vista, pagos, coberturas y precios históricos **coinciden exactamente**.
+No hubo un recálculo ni una conversión masiva de historia.
+
+Resultados del postflight:
+
+- Los nueve contratos, incluidos los cuatro dados de baja, siguen en versión 1
+  y porcentaje 100. Los cinco activos conservan sus saldos.
+- Se conserva el contrato con cobertura histórica. Seis contratos tienen cobros
+  ordinarios históricos y requieren conciliación antes de cambiar de modelo.
+- La tabla de componentes está vacía: no se inventaron desgloses antiguos.
+- RLS habilitada y vistas `security_invoker` conservadas. Las funciones de
+  triggers no son ejecutables por clientes y el esquema privado sigue oculto.
+- Cero inconsistencias de componentes o saldos versión 2. Estos contadores son
+  verificaciones de estructura inicial, no una prueba de nuevos cobros reales.
+- Una transacción de sólo lectura con rol `anon` devuelve cero contratos,
+  componentes y saldos visibles.
+- Advisors no agregó ni retiró avisos respecto del preflight. Persisten avisos
+  anteriores de [search_path](https://supabase.com/docs/guides/database/database-linter?lint=0011_function_search_path_mutable),
+  funciones definer ejecutables por [anon](https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable)
+  y [authenticated](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable),
+  y [protección de contraseñas filtradas](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection).
+  No se cambiaron permisos ajenos a esta migración para silenciar esos avisos.
+
+El conector asignó inicialmente la versión de ejecución `20261116213142`. Se
+alineó **sólo esa entrada recién creada** del historial a `20261115231648`, con
+nombre `catering_iva_separado_usd`, para que coincida con el archivo del repositorio
+y evitar una futura reaplicación. La lista remota confirma la versión canónica.
+
+Los tipos se regeneraron contra el esquema aplicado, preservando las restricciones
+TypeScript existentes. Lint, typecheck, las 138 pruebas TS y build se verifican
+con ese resultado. Continúa pendiente la prueba completa del frontend publicado
+con Supabase Auth/PostgREST; no se cargaron cobros de prueba en producción.
