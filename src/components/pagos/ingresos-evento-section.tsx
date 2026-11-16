@@ -1,4 +1,4 @@
-import { CoberturaDetalle, CoberturaResumen } from "@/components/catering/cobertura-resumen";
+import { CateringFiscalResumen, CobroDesglose, CoberturaDetalle, CoberturaResumen } from "@/components/catering/cobertura-resumen";
 import { ReasignarExcedenteForm } from "@/components/catering/reasignar-excedente-form";
 import { isChequePending } from "@/lib/pagos/calculos";
 import { PagoFechas } from "@/components/pagos/pago-fechas";
@@ -80,8 +80,11 @@ export function IngresosEventoSection({
           />
         </dl>
 
-        {ingresos.coberturas.map(({ id, label, tarifas }) => (
-          <CoberturaResumen key={id} label={label} tarifas={tarifas} />
+        {ingresos.coberturas.map(({ id, label, tarifas, fiscal }) => (
+          <div key={id} className="space-y-4">
+            {fiscal && <CateringFiscalResumen fiscal={fiscal} />}
+            <CoberturaResumen label={label} tarifas={tarifas} />
+          </div>
         ))}
 
         <div className="rounded-lg border border-slate-100">
@@ -124,6 +127,7 @@ export function IngresosEventoSection({
                             ))}
                           </ul>
                         )}
+                        {(pago.catering_cobro_componentes ?? []).map(d => <CobroDesglose key={d.catering_contrato_id} componente={d} />)}
                         {pago.catering_coberturas.map((cobertura) => {
                           const tarifa = ingresos.coberturas.find((c) => c.id === cobertura.catering_contrato_id)
                             ?.tarifas.find((t) => t.categoria === cobertura.categoria);
@@ -148,7 +152,7 @@ export function IngresosEventoSection({
                         {pago.notas ?? "-"}
                       </TableCell>
                       <TableCell className="text-right">
-                        {pago.catering_coberturas.length === 0 && <details className="mb-3 text-left">
+                        {pago.catering_coberturas.length === 0 && !(pago.catering_cobro_componentes ?? []).some(d => d.explicito) && <details className="mb-3 text-left">
                           <summary className="cursor-pointer text-sm">Editar pago</summary>
                           <div className="min-w-72 p-3">
                             <PagoForm editing action={updatePagoAction.bind(null, eventoId, pago.id)}

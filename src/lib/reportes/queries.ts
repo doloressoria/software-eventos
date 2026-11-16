@@ -229,7 +229,7 @@ const SIN_LUGAR = "__sin_lugar__";
 type CateringExternoReporte = Pick<
   Tables<"catering_contratos">,
   "id" | "cliente_nombre" | "fecha_evento" | "lugar_evento" | "total_con_iva" | "saldo_pendiente"
->;
+> & { ajuste_cobertura: number | null };
 
 type CateringMovimientoPago = Pick<Tables<"pagos">, "catering_contrato_id" | "fecha_pago" | "importe_en_pesos" | "es_garantia" | "forma_pago">;
 type CateringMovimientoEgreso = Pick<Tables<"egresos">, "catering_contrato_id" | "fecha_egreso" | "importe_en_pesos" | "categoria">;
@@ -315,7 +315,7 @@ export async function getReportesGenerales(
       total_catering: contrato.total_con_iva,
       total_servicios: 0,
       saldo_catering: contrato.saldo_pendiente,
-      ajuste_cobertura_catering: 0,
+      ajuste_cobertura_catering: contrato.ajuste_cobertura,
       saldo_servicios: 0,
     });
   }
@@ -469,7 +469,7 @@ async function getCateringsExternos(): Promise<CateringExternoReporte[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("v_catering_acreditado")
-    .select("id, cliente_nombre, fecha_evento, lugar_evento, total_con_iva, saldo_pendiente")
+    .select("id, cliente_nombre, fecha_evento, lugar_evento, total_con_iva, saldo_pendiente, ajuste_cobertura")
     .is("evento_id", null)
     .is("deleted_at", null);
 

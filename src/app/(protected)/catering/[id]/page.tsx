@@ -1,3 +1,4 @@
+import { CateringFiscalResumen } from "@/components/catering/cobertura-resumen";
 import Link from "next/link";
 import { ExportExcelButton, ExportExcelScope } from "@/components/commercial-export";
 import { deleteCateringAction, updateCateringAction } from "@/app/(protected)/catering/actions";
@@ -127,7 +128,8 @@ export default async function CateringDetallePage({
           <CardTitle>Totales</CardTitle>
         </CardHeader>
         <CardContent>
-          <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <CateringFiscalResumen fiscal={catering} />
+          <dl className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <DetailItem
               label="Comision organizador"
               value={formatCurrency(catering.comision_organizador_monto ?? 0)}
@@ -138,7 +140,7 @@ export default async function CateringDetallePage({
             />
             {catering.ajuste_ipc !== 0 && <DetailItem label="Ajuste IPC (por importe)" value={formatCurrency(catering.ajuste_ipc)} />}
             <DetailItem
-              label="Total del catering"
+              label="Total a precios vigentes"
               value={formatCurrency(catering.total_con_iva ?? 0)}
               strong
             />

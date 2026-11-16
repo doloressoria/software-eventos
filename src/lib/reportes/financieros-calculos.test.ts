@@ -90,6 +90,7 @@ test("consolida ingresos, egresos, neto, margen y promedios sin contar garantias
   });
 
   assert.equal(reporte.metricas.ingresos_cobrados, 1_500);
+  assert.equal(reporte.metricas.pendiente_cobro, 500, "un resumen ausente no se interpreta como crédito");
   assert.equal(reporte.metricas.egresos_pagados, 650);
   assert.equal(reporte.metricas.resultado_neto, 850);
   assert.equal(reporte.metricas.margen_porcentaje, 56.67);
@@ -231,4 +232,17 @@ test("consolida USD a cotizaciones históricas y ARS usando sólo sus equivalent
   assert.equal(reporte.metricas.ingresos_cobrados, 250500);
   assert.equal(reporte.porEvento[0].ingresos_cobrados, 250500);
   assert.equal(reporte.metricas.garantias_registradas, 120000);
+});
+
+test("reportes separan caja real del ajuste USD y conservan créditos fiscales", () => {
+  const summary = new Map<string, ReporteFinancieroResumen>([["evento-1", {
+    id:"evento-1",total_catering:100000,total_servicios:0,saldo_catering:0,saldo_servicios:0,ajuste_cobertura_catering:-4,
+  }]]);
+  const pagos = [{evento_id:"evento-1",importe_en_pesos:99996,es_garantia:false,forma_pago:"transferencia",fecha_pago:"2026-06-01"}];
+  const input = {eventos:[eventos[0]],resumenByEvento:summary,pagos,egresos:[]};
+  const report = buildReportesFinancieros(input);
+  assert.equal(report.metricas.ingresos_cobrados,99996);
+  assert.equal(report.metricas.pendiente_cobro,0);
+  summary.get("evento-1")!.ajuste_cobertura_catering=-1260004;
+  assert.equal(buildReportesFinancieros(input).metricas.pendiente_cobro,-1260000);
 });

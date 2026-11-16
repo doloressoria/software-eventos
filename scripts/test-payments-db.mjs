@@ -54,14 +54,14 @@ try {
         ...(detallePagos ? [readFileSync("supabase/tests/detalle-pagos.sql", "utf8")] : []),
         readFileSync("supabase/verification/postflight-catering-por-personas.sql", "utf8"),
       ] : []),
-      ...(ipc ? [
+      ...(cobertura ? [
         readFileSync("supabase/tests/fixtures/ipc-baseline.sql", "utf8"),
         readFileSync("supabase/verification/preflight-ipc-programado.sql", "utf8"),
         "create temporary table ipc_servicios_antes as select to_jsonb(s) as datos from public.evento_servicios s;",
         "create temporary table ipc_catering_antes as select to_jsonb(c) as datos from public.catering_contratos c;",
         readFileSync("supabase/migrations/20261110224729_ipc_vigencia_programada.sql", "utf8")
           .replace(/^begin;\n|\ncommit;\n$/g, ""),
-        readFileSync("supabase/tests/ipc-programado.sql", "utf8"),
+        ...(ipc ? [readFileSync("supabase/tests/ipc-programado.sql", "utf8")] : []),
         ...(ipcCron ? [
           "create extension pg_cron;",
           readFileSync("supabase/migrations/20261110224738_programar_ipc_cron.sql", "utf8")
@@ -69,6 +69,12 @@ try {
         ] : []),
         readFileSync("supabase/verification/postflight-ipc-programado.sql", "utf8"),
         ...(ipcCron ? [readFileSync("supabase/verification/postflight-ipc-cron.sql", "utf8")] : []),
+        ...(cobertura ? [
+          readFileSync("supabase/tests/catering-fiscal-before.sql", "utf8"),
+          readFileSync("supabase/migrations/20261115231648_catering_iva_separado_usd.sql", "utf8")
+            .replace(/^begin;\n|\ncommit;\n$/g, ""),
+          readFileSync("supabase/tests/catering-fiscal.sql", "utf8"),
+        ] : []),
         "commit;",
       ] : ["rollback;"]),
     ] : catering ? [
@@ -145,7 +151,8 @@ try {
   console.log(`${(result.stderr.match(/PASS:/g) || []).length} comprobaciones SQL aprobadas.`);
   if (contactos) await checkConcurrentPrincipals();
   if (catering) await checkConcurrentCatering();
-  if (ipc) { checkIpcTypes(); await checkConcurrentIpc(); }
+  if (cobertura) { checkIpcTypes(); await checkConcurrentFiscal(); }
+  if (ipc) await checkConcurrentIpc();
   if (ipcCron) await checkIpcCron();
   console.log("PostgreSQL: pruebas aprobadas; el cluster efímero se elimina al terminar.");
 } catch (error) {
@@ -312,7 +319,7 @@ function checkIpcTypes() {
     select table_name, array_agg(column_name order by column_name) as columns
     from information_schema.columns where table_schema='public' and table_name in
       ('ipc_programaciones','ipc_aplicaciones','v_ipc_programaciones','evento_servicios','catering_contratos',
-       'v_evento_servicios_acreditados','v_catering_acreditado') group by table_name) c`], { encoding: "utf8" }));
+       'v_evento_servicios_acreditados','v_catering_acreditado','catering_cobro_componentes','v_catering_tarifas','v_catering_costos') group by table_name) c`], { encoding: "utf8" }));
   const source = readFileSync("src/types/database.types.ts", "utf8");
   for (const row of rows) {
     const start = source.indexOf(`      ${row.table_name}: {`);
@@ -321,5 +328,35 @@ function checkIpcTypes() {
     const names = [...block.matchAll(/^          (\w+):/gm)].map((m) => m[1]).sort();
     assert.deepEqual(names, row.columns, `${row.table_name}: tipos y catalogo deben tener las mismas columnas`);
   }
-  console.log("Contratos TypeScript: columnas de IPC, tablas y vistas coinciden con el catalogo aislado.");
+  console.log("Contratos TypeScript: columnas de IPC y catering coinciden con el catálogo aislado.");
+}
+
+async function checkConcurrentFiscal() {
+  const args = ["-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-v", "VERBOSITY=verbose",
+    "-h", dir, "-p", "5432", "-U", "postgres", "-d", "postgres"];
+  const run = (sql) => execFileSync(pg("psql"), [...args, "-c", sql], { encoding: "utf8" }).trim().split("\n").at(-1);
+  const contract = run("select catering from public.fiscal_concurrencia_prueba");
+  const auth = "set local role authenticated; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',true);";
+  const race = async (base, capital, iva, lines, expectedError) => {
+    const statements = [1,2].map((n) => `begin; ${auth}
+      set local eventos.test_dia='2026-11-21';
+      select guardar_pago_por_personas('${contract}','00000000-0000-0000-0000-${String(base+n).padStart(12,"0")}',
+        '{"fecha_pago":"2026-11-21","forma_pago":"transferencia","moneda":"ARS","tipo_cambio":1,"importe_moneda_original":${capital+iva},"es_garantia":false,"capital_ars":${capital},"iva_ars":${iva}}', '${lines}');
+      select pg_sleep(.15); commit;`);
+    const results = await Promise.all(statements.map((sql) => new Promise((resolve,reject) => {
+      const child = spawn(pg("psql"),[...args,"-c",sql]);
+      let stderr = "";
+      child.stdout.resume();
+      child.stderr.on("data", data => { stderr += data; });
+      child.on("error",reject);
+      child.on("close",status => resolve({status,stderr}));
+    })));
+    assert.equal(results.filter(r => r.status === 0).length,1,JSON.stringify(results));
+    assert.ok(results.find(r => r.status !== 0)?.stderr.includes(expectedError),JSON.stringify(results));
+  };
+  await race(950,0,21000,"[]","P2004");
+  await race(960,100000,0,'[{"categoria":"adultos","cantidad":1,"precio_aplicado":100000}]',"P2003");
+  assert.equal(run(`set eventos.test_dia='2026-11-21'; select total_pagado||'|'||saldo_pendiente||'|'||iva_pendiente from v_catering_acreditado where id='${contract}'`),"121000.00|0.00|0.00");
+  assert.equal(run(`select count(*) from pagos where catering_contrato_id='${contract}'`),"2");
+  console.log("Concurrencia real: un único cobro de IVA y una única cobertura PAX; los intentos simultáneos duplicados se rechazan.");
 }

@@ -102,6 +102,8 @@ export async function createCateringAction(
       comision_organizador_monto: payload.comision_organizador_monto,
       iva_comision: payload.iva_comision,
       iva_porcentaje: payload.iva_porcentaje,
+      porcentaje_facturado: payload.porcentaje_facturado,
+      version_calculo: payload.version_calculo,
       notas: payload.notas,
     },
     p_precio: payload.precio_unitario_inicial,
@@ -160,6 +162,8 @@ export async function updateCateringAction(
     comision_organizador_monto: payload.comision_organizador_monto,
     iva_comision: payload.iva_comision,
     iva_porcentaje: payload.iva_porcentaje,
+    porcentaje_facturado: payload.porcentaje_facturado,
+    version_calculo: payload.version_calculo,
     notas: payload.notas,
     updated_at: new Date().toISOString(),
   };
@@ -184,7 +188,7 @@ export async function updateCateringAction(
 
   if (error) {
     logSupabaseError("updateCateringAction actualizar", error);
-    return { ...state, formError: "No se pudo actualizar el catering. Intenta nuevamente." };
+    return { ...state, formError: error.code === "23514" ? "Revisá el porcentaje y el modelo: un contrato con cobros ordinarios históricos requiere conciliación antes de separar IVA." : "No se pudo actualizar el catering. Intenta nuevamente." };
   }
 
   if (!data) {

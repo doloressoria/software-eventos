@@ -19,6 +19,7 @@ export const AUDITED_TABLES = [
   "egresos",
   "catering_contratos",
   "catering_coberturas",
+  "catering_cobro_componentes",
   "catering_precio_historial",
   "catering_items",
   "usuarios",

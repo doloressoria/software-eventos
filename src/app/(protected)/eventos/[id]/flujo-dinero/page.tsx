@@ -1,4 +1,5 @@
 import { PagoFechas } from "@/components/pagos/pago-fechas";
+import { CobroDesglose } from "@/components/catering/cobertura-resumen";
 import { PagoImporte } from "@/components/pagos/pago-importe";
 import Link from "next/link";
 import { EventoDetalleNav } from "@/components/eventos/evento-detalle-nav";
@@ -171,6 +172,7 @@ export default async function EventoFlujoDineroPage({
                     <TableCell className="font-medium text-slate-950">
                       <div className="flex flex-wrap items-center gap-2">
                         <span>{pago.concepto ?? "-"}</span>
+                        {pago.catering_cobro_componentes.map(d => <CobroDesglose key={d.catering_contrato_id} componente={d} />)}
                         {pago.es_garantia ? (
                           <Badge variant="warning">Garantia</Badge>
                         ) : null}

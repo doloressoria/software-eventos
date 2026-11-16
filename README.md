@@ -326,6 +326,8 @@ y la prueba aislada `pnpm test:imputaciones:db`.
 
 Los [cobros de catering por personas](docs/catering-por-personas.md) tienen un
 runbook de publicación manual y la prueba aislada `pnpm test:cobertura:db`.
+La [versión con IVA separado y redondeo USD](docs/catering-iva-separado-usd.md)
+documenta porcentaje facturado, transición histórica y SQL completo con preflight/postflight.
 
 ### IPC programado por fecha de vigencia
 

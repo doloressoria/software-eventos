@@ -40,3 +40,23 @@ test("un catering historico puede conservar lugar sin especificar al editar", ()
   const result = validateCateringForm(form(false), { mode: "edit" });
   assert.equal(result.payload?.lugar_evento, null);
 });
+
+test("porcentaje facturado tiene escala propia 0..100 y no cambia la escala de alícuotas", () => {
+  const data = form(true);
+  data.set("porcentaje_facturado", "30,25");
+  data.set("iva_porcentaje", "21");
+  data.set("iva_comision", "10.5");
+  const result = validateCateringForm(data, { mode: "create" });
+  assert.equal(result.payload?.porcentaje_facturado, 30.25);
+  assert.equal(result.payload?.iva_porcentaje, 0.21);
+  assert.equal(result.payload?.iva_comision, 0.105);
+  assert.equal(result.payload?.version_calculo, 2);
+  for (const value of ["0","100"]) {
+    data.set("porcentaje_facturado", value);
+    assert.equal(validateCateringForm(data, { mode: "create" }).payload?.porcentaje_facturado, Number(value));
+  }
+  for (const value of ["-1","101","30.123","NaN","1e1"]) {
+    data.set("porcentaje_facturado", value);
+    assert.equal(validateCateringForm(data, { mode: "create" }).payload, null);
+  }
+});

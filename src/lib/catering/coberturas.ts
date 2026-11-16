@@ -4,14 +4,19 @@ import { parsePaymentDecimal } from "../pagos/validation";
 
 export type TarifaPax = Tables<"v_catering_tarifas">;
 export type CoberturaPax = Tables<"catering_coberturas">;
-export type OpcionCobertura = { id: string; label: string; tarifas: TarifaPax[] };
+export type FiscalCatering = Pick<Tables<"v_catering_acreditado">,
+  "version_calculo" | "neto_vigente" | "neto_exigible" | "porcentaje_facturado" | "base_imponible" |
+  "iva_porcentaje" | "iva_calculado" | "iva_exigible" | "iva_cobrado" | "iva_cancelado" | "iva_reservado" |
+  "iva_pendiente" | "ajuste_redondeo">;
+export type ComponenteCatering = Tables<"catering_cobro_componentes">;
+export type OpcionCobertura = { id: string; label: string; tarifas: TarifaPax[]; fiscal?: FiscalCatering };
 
 export function cantidadPax(value: string) {
   const cantidad = Number(value);
   return /^\d{1,10}$/.test(value) && cantidad > 0 && cantidad <= 2147483647 ? cantidad : 0;
 }
 
-export function lineasCobertura(form: FormData) {
+export function lineasCobertura(form: FormData, permitirVacio = false) {
   const lineas = [];
   for (const [categoria] of categoriasPax) {
     const value = form.get(`cantidad_${categoria}`);
@@ -21,7 +26,7 @@ export function lineasCobertura(form: FormData) {
     if (!cantidad || precio === null) return null;
     lineas.push({ categoria, cantidad, precio_aplicado: precio });
   }
-  return lineas.length ? lineas : null;
+  return lineas.length || permitirVacio ? lineas : null;
 }
 
 export function nombreCategoria(categoria: string) {

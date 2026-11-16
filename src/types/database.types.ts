@@ -134,6 +134,48 @@ export type Database = {
           },
         ]
       }
+      catering_cobro_componentes: {
+        Row: {
+          pago_id: string
+          catering_contrato_id: string
+          version_calculo: number
+          explicito: boolean
+          objetivo_ars: number
+          capital_ars: number | null
+          iva_ars: number | null
+          ajuste_ars: number
+          ajuste_iva_ars: number
+          capital_reasignado_ars: number
+        }
+        Insert: {
+          pago_id: string
+          catering_contrato_id: string
+          version_calculo: number
+          explicito?: boolean
+          objetivo_ars: number
+          capital_ars?: number | null
+          iva_ars?: number | null
+          ajuste_ars?: number
+          ajuste_iva_ars?: number
+          capital_reasignado_ars?: number
+        }
+        Update: {
+          pago_id?: string
+          catering_contrato_id?: string
+          version_calculo?: number
+          explicito?: boolean
+          objetivo_ars?: number
+          capital_ars?: number | null
+          iva_ars?: number | null
+          ajuste_ars?: number
+          ajuste_iva_ars?: number
+          capital_reasignado_ars?: number
+        }
+        Relationships: [
+          { foreignKeyName: "catering_cobro_componentes_pago_id_fkey"; columns: ["pago_id"]; isOneToOne: false; referencedRelation: "pagos"; referencedColumns: ["id"] },
+          { foreignKeyName: "catering_cobro_componentes_catering_contrato_id_fkey"; columns: ["catering_contrato_id"]; isOneToOne: false; referencedRelation: "catering_contratos"; referencedColumns: ["id"] }
+        ]
+      }
       catering_coberturas: {
         Row: {
           cantidad: number
@@ -221,6 +263,8 @@ export type Database = {
           fecha_evento: string | null
           id: string
           iva_comision: number | null
+          porcentaje_facturado: number
+          version_calculo: number
           iva_porcentaje: number | null
           lugar_evento: string | null
           monto_con_factura: number | null
@@ -264,6 +308,8 @@ export type Database = {
           fecha_evento?: string | null
           id?: string
           iva_comision?: number | null
+          porcentaje_facturado?: number
+          version_calculo?: number
           iva_porcentaje?: number | null
           lugar_evento?: string | null
           monto_con_factura?: number | null
@@ -307,6 +353,8 @@ export type Database = {
           fecha_evento?: string | null
           id?: string
           iva_comision?: number | null
+          porcentaje_facturado?: number
+          version_calculo?: number
           iva_porcentaje?: number | null
           lugar_evento?: string | null
           monto_con_factura?: number | null
@@ -1673,6 +1721,18 @@ export type Database = {
       }
       v_catering_acreditado: {
         Row: {
+          porcentaje_facturado: number | null
+          version_calculo: number | null
+          neto_vigente: number | null
+          neto_exigible: number | null
+          base_imponible: number | null
+          iva_calculado: number | null
+          iva_exigible: number | null
+          iva_cobrado: number | null
+          iva_cancelado: number | null
+          iva_reservado: number | null
+          iva_pendiente: number | null
+          ajuste_redondeo: number | null
           ajuste_cobertura: number | null
           ajuste_ipc: number | null
           cliente_contacto: string | null
@@ -1772,6 +1832,7 @@ export type Database = {
       }
       v_catering_tarifas: {
         Row: {
+          version_calculo: number | null
           adicional_unitario: number | null
           categoria: string | null
           catering_contrato_id: string | null

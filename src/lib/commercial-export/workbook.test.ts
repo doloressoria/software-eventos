@@ -11,7 +11,7 @@ test("PAGOS concilia USD, cheque pendiente, reparto y catering recotizado con In
   const book = await buildCommercialWorkbook(data);
   assert.deepEqual(book.worksheets.map((s) => s.name), ["PAGOS", "IMPUTACIONES", "PAX"]);
   assert.equal(amount(book, "PAGOS", "Total a precios vigentes (ARS)", 12), 13600);
-  assert.equal(amount(book, "PAGOS", "Ajuste por cobertura histórica de catering (ARS)", 12), -800);
+  assert.equal(amount(book, "PAGOS", "Ajuste por historia y redondeo de catering (ARS)", 12), -800);
   assert.equal(amount(book, "PAGOS", "Ingresos ordinarios acreditados (ARS)", 12), 3000);
   assert.equal(amount(book, "PAGOS", "Saldo pendiente (ARS)", 12), 9800);
   assert.equal(amount(book, "PAGOS", "Cheques ordinarios pendientes de acreditación (ARS)", 12), 900);
@@ -120,7 +120,8 @@ test("catering extiende pagos, ítems e historial y reconcilia hojas para cobros
   assert.ok(texts(book).includes("Adicional ficticio 18"));
   assert.equal(amount(book, "DC", "Total del catering — detalle", 8), data.catering.total_con_iva);
   assert.equal(amount(book, "DC", "Saldo pendiente — detalle", 8), data.catering.saldo_pendiente);
-  assert.ok(texts(book).some((text) => text.includes("pantalla de ingresos") && text.includes("mínimo cero")));
+  assert.equal(amounts.incomeBalance, amounts.detailBalance);
+  assert.ok(texts(book).some((text) => text.includes("saldos negativos") && text.includes("a favor")));
   assert.equal(book.getWorksheet("DC")!.getCell("H18").value, 12);
   assert.equal(book.getWorksheet("VALORES TOTALES POR SEPARADO")!.getCell("H11").value, amounts.calculatedTotal);
   for (const name of ["INDEC", "% FIJO "]) {
@@ -274,7 +275,7 @@ test("el Excel de catering conserva el importe histórico y toma el saldo SQL de
   const data = exampleCatering({ paymentCount: 1, itemCount: 0 });
   data.catering.saldo_pendiente = 225000;
   data.catering.total_pagado = 400000;
-  data.tarifas = [{
+  data.tarifas = [{ version_calculo: 1,
     categoria: "jovenes", catering_contrato_id: data.catering.id, evento_id: data.catering.evento_id,
     pax: 15, precio_base: 44000, adicional_unitario: 1000, precio_aplicado: 45000,
     cubiertos: 10, cobertura_ars: 400000, excedente: 0, pendientes: 5,
@@ -314,4 +315,22 @@ test("IPC monetario se exporta separado del IVA y conserva el saldo de catering"
   const cateringBook = await buildCommercialWorkbook(catering);
   assert.equal(amount(cateringBook, "DC", "Ajuste IPC incluido — cargo por importe, separado del IVA", 8), 20000);
   assert.equal(amount(cateringBook, "DC", "Saldo pendiente — detalle", 8), catering.catering.saldo_pendiente);
+});
+
+test("catering separado exporta IVA, ajuste USD y caja sin duplicar componentes", async () => {
+  const data = exampleCatering({ paymentCount: 0 });
+  Object.assign(data.catering, { version_calculo: 2, porcentaje_facturado: 30, neto_vigente: 20000000,
+    neto_exigible: 20000000, base_imponible: 6000000, iva_calculado: 1260000, iva_exigible: 1260000,
+    iva_cobrado: 0, iva_cancelado: 0, iva_reservado: 0, iva_pendiente: 1260000, ajuste_redondeo: 4,
+    total_pagado: 99996, total_con_iva: 21260000, saldo_pendiente: 21160000 });
+  data.payments = [{ ...examplePayment(1, data.catering.id), moneda: "USD", tipo_cambio: 1200,
+    importe_moneda_original: 83.33, importe_en_pesos: 99996, es_garantia: false }];
+  data.componentes = [{ pago_id: data.payments[0].id, catering_contrato_id: data.catering.id,
+    version_calculo: 2, explicito: true, objetivo_ars: 100000, capital_ars: 100000, iva_ars: 0,
+    ajuste_ars: 4, ajuste_iva_ars: 0, capital_reasignado_ars: 0 }];
+  const book = await buildCommercialWorkbook(data);
+  assert.equal(amount(book,"DC","IVA pendiente / a favor (−)",8),1260000);
+  assert.equal(amount(book,"DC","Ajuste de redondeo acreditado (no es ingreso)",8),4);
+  assert.equal(amount(book,"DC","Cobros ordinarios registrados",8),99996);
+  assert.ok(texts(book).includes("DESGLOSE HISTÓRICO DE COBROS (NO SUMAR A INGRESOS)"));
 });

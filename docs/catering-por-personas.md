@@ -1,5 +1,8 @@
 # Catering por categoría y cobros por personas
 
+> Actualización 15/11/2026: [IVA separado y redondeo USD](catering-iva-separado-usd.md).
+> Las reglas siguientes describen el modelo histórico; la versión 2 se documenta allí.
+
 ## Precios y saldo
 
 El historial de catering guarda el precio general y, en la misma versión, los

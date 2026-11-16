@@ -279,7 +279,7 @@ function cateringWorkbook(book: ExcelJS.Workbook, template: ExcelJS.Workbook, da
   row(sheet, source, 19, 19, ["Precio general de respaldo", c.tipo_servicio, amounts.unitPrice, null, null, null, "Importe base por PAX", amounts.paxSubtotal], 8);
   let r = 20;
   if (data.tarifas.length > 0) {
-    row(sheet, source, r++, 18, ["Categoría", "PAX contratados", "Precio base sin IVA", "Adicional por persona sin IVA", "Precio aplicado con IVA", "Cubiertos", "PAX pendientes", "Saldo de PAX"], 8);
+    row(sheet, source, r++, 18, ["Categoría", "PAX contratados", "Precio base sin IVA", "Adicional por persona sin IVA", c.version_calculo === 2 ? "Capital aplicado sin IVA" : "Precio aplicado con IVA", "Cubiertos", "PAX pendientes", "Saldo de PAX"], 8);
     for (const [categoria, label] of categoriasPax) {
       const tarifa = data.tarifas.find((t) => t.categoria === categoria);
       if (!tarifa) continue;
@@ -309,7 +309,6 @@ function cateringWorkbook(book: ExcelJS.Workbook, template: ExcelJS.Workbook, da
   total(sheet, source, r++, "Garantías registradas — no reducen el saldo", amounts.guarantees, 8);
   if (amounts.difference !== 0) note(sheet, source, r++, `El total del detalle es ${money(amounts.storedTotal)} y el desglose según los datos actuales suma ${money(amounts.calculatedTotal)}. Diferencia: ${money(amounts.difference)}. Se mantiene el total del detalle.`, 8);
   if (amounts.storedPaid !== amounts.paid) note(sheet, source, r++, `El cobrado acreditado es ${money(amounts.storedPaid)} y los pagos ordinarios disponibles suman ${money(amounts.paid)}. El saldo del detalle utiliza el importe acreditado.`, 8);
-  if (amounts.detailBalance !== amounts.incomeBalance) note(sheet, source, r++, `El saldo del detalle es ${money(amounts.detailBalance)}. En la pantalla de ingresos, el saldo pendiente es ${money(amounts.incomeBalance)}, con mínimo cero.`, 8);
   if (amounts.unitPrice === null) note(sheet, source, r++, "No hay un precio vigente por persona guardado. El total del detalle se conserva sin reconstruir precios.", 8);
   if (!data.eventAllowed) note(sheet, source, r++, `${PARTIAL_NOTICE} Los datos del evento vinculado no están incluidos.`, 8);
   note(sheet, source, r++, "Los saldos negativos del detalle indican un importe a favor.", 8);
@@ -319,7 +318,7 @@ function cateringWorkbook(book: ExcelJS.Workbook, template: ExcelJS.Workbook, da
   if (pending.length) r = paymentBlock(sheet, source, r, "CHEQUES PENDIENTES — NO APLICADOS AL SALDO", pending, undefined, 8);
   if (data.coberturas.length > 0) {
     band(sheet, source, r++, "COBERTURA HISTÓRICA POR PERSONAS", 8);
-    row(sheet, source, r++, 18, ["Categoría", "PAX del cobro", "Precio aplicado con IVA", "Importe original", "PAX reasignados", "Estado"], 8);
+    row(sheet, source, r++, 18, ["Categoría", "PAX del cobro", c.version_calculo === 2 ? "Capital aplicado sin IVA" : "Precio aplicado con IVA", "Importe original", "PAX reasignados", "Estado"], 8);
     for (const linea of data.coberturas) {
       const pago = data.payments.find((p) => (p.pago_id ?? p.id) === linea.pago_id);
       row(sheet, source, r, 19, [nombreCategoria(linea.categoria), linea.cantidad, linea.precio_aplicado,
@@ -333,6 +332,21 @@ function cateringWorkbook(book: ExcelJS.Workbook, template: ExcelJS.Workbook, da
     ["IVA del precio vigente y los ítems según tasa guardada", amounts.vat], ["Total según precios y adicionales actuales (incluye comisión e IVA)", amounts.calculatedTotal],
     ["Total sin IVA guardado", c.total_sin_iva]] as const) total(sheet, source, r++, label, value, 8);
   note(sheet, source, r++, `Tasa de IVA catering: ${c.iva_porcentaje === null ? "sin dato guardado" : `${c.iva_porcentaje * 100} %`}. Tasa de IVA comisión: ${c.iva_comision === null ? "sin dato guardado" : `${c.iva_comision * 100} %`}.`, 8);
+  band(sheet, source, r++, "IVA CATERING Y REDONDEO", 8);
+  note(sheet, source, r++, `Modelo: ${c.version_calculo === 2 ? "capital e IVA separados" : "histórico con IVA incluido; cobros sin desglose a conciliar"}. Porcentaje facturado del neto: ${c.porcentaje_facturado ?? 100} %.`, 8);
+  for (const [label,value] of [
+    ["Base imponible a precios vigentes", c.base_imponible], ["Neto exigible con capital histórico", c.neto_exigible],
+    ["IVA a precios vigentes", c.iva_calculado], ["IVA exigible", c.iva_exigible],
+    ["IVA cobrado real", c.iva_cobrado], ["IVA cancelado incluyendo ajuste", c.iva_cancelado],
+    ["IVA reservado por cheques", c.iva_reservado], ["IVA pendiente / a favor (−)", c.iva_pendiente],
+    ["Ajuste de redondeo acreditado (no es ingreso)", c.ajuste_redondeo],
+  ] as const) if (value !== undefined && (c.version_calculo === 2 || label.startsWith("Base") || label.startsWith("Ajuste"))) total(sheet, source, r++, label, value, 8);
+  if (data.componentes.length) {
+    band(sheet, source, r++, "DESGLOSE HISTÓRICO DE COBROS (NO SUMAR A INGRESOS)", 8);
+    row(sheet, source, r++, 18, ["Pago", "Capital objetivo", "IVA objetivo", "Objetivo legacy con IVA", "Ajuste capital / legacy", "Ajuste IVA", "Capital real reasignado", "Modelo"], 8);
+    for (const d of data.componentes) row(sheet, source, r++, 19, [d.pago_id,d.capital_ars,d.iva_ars,d.version_calculo === 1 ? d.objetivo_ars : null,
+      d.ajuste_ars - d.ajuste_iva_ars,d.ajuste_iva_ars,d.capital_reasignado_ars,d.version_calculo], 8);
+  }
   band(sheet, source, r++, "FACTURACIÓN", 8);
   for (const [label, value] of [["Monto con factura", c.monto_con_factura], ["Monto sin factura", c.monto_sin_factura]] as const) total(sheet, source, r++, label, value, 8);
   if (c.monto_con_factura !== null && c.monto_sin_factura !== null && roundMoney(c.monto_con_factura + c.monto_sin_factura) !== amounts.storedTotal) note(sheet, source, r++, `Los montos con y sin factura guardados suman ${money(roundMoney(c.monto_con_factura + c.monto_sin_factura))}. El total del detalle es ${money(amounts.storedTotal)}. No se ajustaron los datos de facturación.`, 8);
@@ -409,12 +423,12 @@ function paymentHistoryWorkbook(book: ExcelJS.Workbook, template: ExcelJS.Workbo
   note(sheet, source, r++, `Cliente: ${event.cliente_nombre}\nEvento: ${event.nombre_evento ?? event.tipo_evento ?? "Sin nombre"}\nSalón: ${event.salones?.nombre ?? "No disponible"}`, 12);
   row(sheet, source, r++, 90, ["Fecha del evento", date(event.fecha_evento), "Saldo al", date(ingresos.fechaSaldo)], 12);
   total(sheet, source, r++, "Total a precios vigentes (ARS)", ingresos.totalEvento, 12);
-  total(sheet, source, r++, "Ajuste por cobertura histórica de catering (ARS)", ingresos.ajusteCobertura, 12);
+  total(sheet, source, r++, "Ajuste por historia y redondeo de catering (ARS)", ingresos.ajusteCobertura, 12);
   total(sheet, source, r++, "Ingresos ordinarios acreditados (ARS)", ingresos.totalCobrado, 12);
   total(sheet, source, r++, "Saldo pendiente (ARS)", ingresos.saldoPendiente, 12);
   total(sheet, source, r++, "Cheques ordinarios pendientes de acreditación (ARS)", sum(payments.filter((p) => !p.es_garantia && pending(p)).map((p) => p.importe_en_pesos)), 12);
   total(sheet, source, r++, "Garantías registradas (ARS)", sumGuarantees(payments), 12);
-  note(sheet, source, r++, "Saldo a la fecha indicada, con mínimo cero: total vigente + ajuste por cobertura histórica − ingresos ordinarios acreditados. Las garantías y los cheques pendientes no reducen el saldo. Para cheques, la fecha de pago / acreditación es su fecha de acreditación prevista.", 12);
+  note(sheet, source, r++, "Saldo a la fecha indicada (negativo = a favor): total vigente + ajuste por historia y redondeo − ingresos ordinarios acreditados. Las garantías y los cheques pendientes no reducen el saldo. Para cheques, la fecha de pago / acreditación es su fecha de acreditación prevista.", 12);
   if (payments.some((p) => p.moneda !== "ARS" && p.importe_en_pesos === null)) {
     note(sheet, source, r++, "Hay cobros sin equivalente histórico en ARS. Sus celdas quedan vacías; los totales incluyen únicamente los equivalentes disponibles, igual que Ingresos. No se recalculan con una cotización actual.", 12);
   }
@@ -475,6 +489,12 @@ function paymentHistoryWorkbook(book: ExcelJS.Workbook, template: ExcelJS.Workbo
     r++; count++;
   }
   if (!count) note(pax, source, r++, "Sin coberturas históricas registradas.", 10);
+  band(pax, source, r++, "CAPITAL, IVA Y AJUSTES (NO SON INGRESOS ADICIONALES)", 10);
+  row(pax, source, r++, 90, ["Pago", "Catering", "Capital objetivo", "IVA objetivo", "Legacy con IVA", "Ajuste capital / legacy", "Ajuste IVA", "Capital real reasignado"], 10);
+  for (const payment of payments) for (const d of payment.catering_cobro_componentes ?? []) {
+    row(pax, source, r++, 90, [payment.id,d.catering_contrato_id,d.capital_ars,d.iva_ars,d.version_calculo === 1 ? d.objetivo_ars : null,
+      d.ajuste_ars - d.ajuste_iva_ars,d.ajuste_iva_ars,d.capital_reasignado_ars], 10);
+  }
   pax.views = [{ state: "frozen", ySplit: 3, showGridLines: false }];
   finish(pax, r - 1, 10);
   for (const output of [sheet, allocations, pax]) {

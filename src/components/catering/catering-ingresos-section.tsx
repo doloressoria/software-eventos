@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CoberturaDetalle, CoberturaResumen } from "@/components/catering/cobertura-resumen";
+import { CateringFiscalResumen, CobroDesglose, CoberturaDetalle, CoberturaResumen } from "@/components/catering/cobertura-resumen";
 import { PagoFechas } from "@/components/pagos/pago-fechas";
 import { PagoImporte } from "@/components/pagos/pago-importe";
 import {
@@ -70,6 +70,7 @@ export function CateringIngresosSection({
           />
         </dl>
 
+        {ingresos.fiscal && <CateringFiscalResumen fiscal={ingresos.fiscal} />}
         <CoberturaResumen tarifas={ingresos.tarifas} />
         {eventoId && ingresos.tarifas.some((tarifa) => (tarifa.excedente ?? 0) > 0) && (
           <Link className="text-sm font-medium underline" href={`/eventos/${eventoId}/ingresos`}>Ver opciones de reasignación en Ingresos del evento</Link>
@@ -108,6 +109,7 @@ export function CateringIngresosSection({
                             <Badge variant="warning">Garantia</Badge>
                           ) : null}
                         </div>
+                        {ingresos.componentes.filter(d => d.pago_id === pago.pago_id).map(d => <CobroDesglose key={d.catering_contrato_id} componente={d} />)}
                         {coberturas.map((linea) => <p key={linea.categoria} className="mt-1 text-xs"><CoberturaDetalle cobertura={linea} /></p>)}
                       </TableCell>
                       <TableCell>{getFormaPagoLabel(pago.forma_pago)}</TableCell>
@@ -124,7 +126,7 @@ export function CateringIngresosSection({
                           <span className="text-sm">Se administra en Ingresos del evento</span>
                         ) : (
                           <>
-                            {coberturas.length === 0 && <details className="mb-3 text-left">
+                            {coberturas.length === 0 && !ingresos.componentes.some(d => d.pago_id === pago.pago_id && d.explicito) && <details className="mb-3 text-left">
                               <summary className="cursor-pointer text-sm">Editar pago</summary>
                               <div className="min-w-72 p-3">
                                 <CateringPagoForm editing
@@ -155,7 +157,7 @@ export function CateringIngresosSection({
             <CateringPagoForm
               action={createCateringPagoAction.bind(null, cateringId)}
               initialState={getEmptyPagoFormState()}
-              coberturas={gestionaCatering ? [{ id: cateringId, label: "Catering", tarifas: ingresos.tarifas }] : undefined}
+              coberturas={gestionaCatering ? [{ id: cateringId, label: "Catering", tarifas: ingresos.tarifas, fiscal: ingresos.fiscal ?? undefined }] : undefined}
             />
           </div>
         </div>

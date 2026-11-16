@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Tables } from "../../types/database.types";
-import type { CoberturaPax, OpcionCobertura } from "../catering/coberturas";
+import type { CoberturaPax, OpcionCobertura, ComponenteCatering } from "../catering/coberturas";
 import type { ImputacionDestino } from "./validation";
 import { allRows } from "../commercial-export/rows";
 import { ExportError } from "../commercial-export/types";
@@ -26,6 +26,7 @@ export type PagoEvento = Pick<
   | "registrado_por"
 > & {
   catering_coberturas: CoberturaPax[];
+  catering_cobro_componentes: ComponenteCatering[];
   pago_imputaciones: Pick<Tables<"pago_imputaciones">, "evento_servicio_id" | "catering_contrato_id" | "importe_ars">[];
 };
 
@@ -44,13 +45,13 @@ export type EventoIngresos = {
 export async function loadEventoIngresos(supabase: SupabaseClient<Database>, eventoId: string): Promise<EventoIngresos> {
   const [pagos, resumenResult, contratos, tarifas] = await Promise.all([
     allRows((start, end) => supabase.from("pagos").select(
-      "id, catering_contrato_id, concepto, created_at, es_garantia, evento_servicio_id, fecha_pago, forma_pago, importe_en_pesos, importe_moneda_original, moneda, tipo_cambio, banco, numero_cheque, notas, registrado_por, catering_coberturas(*), pago_imputaciones(evento_servicio_id,catering_contrato_id,importe_ars)",
+      "id, catering_contrato_id, concepto, created_at, es_garantia, evento_servicio_id, fecha_pago, forma_pago, importe_en_pesos, importe_moneda_original, moneda, tipo_cambio, banco, numero_cheque, notas, registrado_por, catering_coberturas(*), catering_cobro_componentes(*), pago_imputaciones(evento_servicio_id,catering_contrato_id,importe_ars)",
     ).eq("evento_id", eventoId).is("deleted_at", null)
       .order("fecha_pago", { ascending: false }).order("created_at", { ascending: false }).order("id")
       .range(start, end)),
     supabase.from("v_resumen_evento").select("total_catering,total_servicios,ajuste_cobertura_catering")
       .eq("id", eventoId).maybeSingle(),
-    allRows((start, end) => supabase.from("v_catering_acreditado").select("id,tipo_servicio,saldo_pendiente")
+    allRows((start, end) => supabase.from("v_catering_acreditado").select("*")
       .eq("evento_id", eventoId).is("deleted_at", null).order("created_at").order("id").range(start, end)),
     allRows((start, end) => supabase.from("v_catering_tarifas").select("*").eq("evento_id", eventoId)
       .order("catering_contrato_id").order("categoria").range(start, end)),
@@ -73,9 +74,9 @@ export async function loadEventoIngresos(supabase: SupabaseClient<Database>, eve
     estadoCobro: summary.estadoCobro, cateringDestinos,
     coberturas: cateringDestinos.map(({ value, label }) => {
       const id = value.slice("catering:".length);
-      return { id, label, tarifas: tarifas.filter((row) => row.catering_contrato_id === id) };
+      return { id, label, fiscal: contratos.find(c => c.id === id), tarifas: tarifas.filter((row) => row.catering_contrato_id === id) };
     }),
-    pagos, saldoPendiente: summary.saldoPendiente, totalCobrado: summary.totalCobrado,
+    pagos, saldoPendiente: Math.round((totalEvento + ajusteCobertura - sumOrdinaryPayments(pagos)) * 100) / 100, totalCobrado: summary.totalCobrado,
     totalEvento: summary.totalEvento, ajusteCobertura, fechaSaldo: getArgentinaPaymentDay(),
   };
 }

@@ -109,6 +109,7 @@ export type ReporteFinancieroEgreso = {
 };
 
 export type ReporteFinancieroResumen = {
+  ajuste_cobertura_catering?: number | null;
   id: string | null;
   saldo_catering: number | null;
   saldo_servicios: number | null;
@@ -479,10 +480,7 @@ function getPendienteCobroEstimado(
   row: ReporteFinancieroResumen | undefined,
   totalCobrado: number,
 ) {
-  return Math.max(
-    roundMoney(getTotalVendidoEstimado(row) - totalCobrado),
-    0,
-  );
+  return row ? roundMoney(getTotalVendidoEstimado(row) + toMoneyNumber(row.ajuste_cobertura_catering) - totalCobrado) : 0;
 }
 
 function getPromedioPorEvento(total: number, eventos: number) {

@@ -1,5 +1,8 @@
 # Pagos en USD con cotización manual — 2026-10-21
 
+> Actualización 15/11/2026: [IVA separado y redondeo USD](catering-iva-separado-usd.md).
+> Las reglas siguientes describen el modelo histórico; la versión 2 se documenta allí.
+
 ## Cambios locales
 
 Eventos, catering asociado y catering externo comparten los campos monetarios y la

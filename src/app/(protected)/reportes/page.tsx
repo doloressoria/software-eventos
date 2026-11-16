@@ -234,7 +234,7 @@ export default async function ReportesPage({
           helper="Catering y servicios del periodo"
         />
         <SummaryCard
-          label="Saldo pendiente"
+          label="Saldo por cobrar / a favor"
           value={formatCurrency(reportes.metrics.saldoPendiente)}
           helper="Saldos estimados de eventos"
           valueClassName={
@@ -375,9 +375,9 @@ export default async function ReportesPage({
             helper="Servicios y catering incluidos"
           />
           <SummaryCard
-            label="Pendiente de cobro"
+            label="Saldo por cobrar / a favor"
             value={formatCurrency(financieros.metricas.pendiente_cobro)}
-            helper="Saldo estimado del resumen"
+            helper="Incluye historia y redondeo; negativo = a favor"
             valueClassName={
               financieros.metricas.pendiente_cobro > 0
                 ? "text-amber-700"
@@ -932,7 +932,7 @@ function FinancialSalonTable({
                 <TableHead className="text-right">Egresos</TableHead>
                 <TableHead className="text-right">Neto</TableHead>
                 <TableHead className="text-right">Margen</TableHead>
-                <TableHead className="text-right">Pendiente</TableHead>
+                <TableHead className="text-right">Saldo / a favor (−)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1163,7 +1163,7 @@ function FinancialEventTable({
                 <TableHead className="text-right">Neto</TableHead>
                 <TableHead className="text-right">Margen</TableHead>
                 <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Pendiente</TableHead>
+                <TableHead className="text-right">Saldo / a favor (−)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

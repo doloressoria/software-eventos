@@ -422,6 +422,17 @@ export function CateringForm({
               defaultValue={state.fields.iva_comision}
               error={state.errors.iva_comision}
             />
+            <input type="hidden" name="version_calculo" value={mode === "create" ? "2" : initialState.fields.version_calculo} />
+            {mode === "edit" && initialState.fields.version_calculo === "1" && <div className="md:col-span-2 text-sm">
+              <p>Modelo histórico: las coberturas incluyen IVA. Los cobros anteriores requieren conciliación para separar capital e IVA.</p>
+              <label className="mt-2 flex items-center gap-2"><input type="checkbox" name="activar_modelo_separado" defaultChecked={state.fields.version_calculo === "2"} /> Adoptar capital e IVA separados (sólo si nunca hubo cobros ordinarios).</label>
+            </div>}
+            <PercentageField
+              id="porcentaje_facturado"
+              label="Porcentaje facturado del neto (%)"
+              defaultValue={state.fields.porcentaje_facturado}
+              error={state.errors.porcentaje_facturado}
+            />
             <PercentageField
               id="iva_porcentaje"
               label="IVA del catering (%)"

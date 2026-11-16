@@ -1,5 +1,8 @@
 # Imputaciones de cobros del evento
 
+> Actualización 15/11/2026: [IVA separado y redondeo USD](catering-iva-separado-usd.md).
+> Las reglas siguientes describen el modelo histórico; la versión 2 se documenta allí.
+
 En **Eventos → Ingresos**, un cobro tiene entre 1 y 50 destinos distintos. Se
 puede elegir cualquier servicio del evento o un contrato de catering activo
 vinculado al mismo evento. Cada línea se carga en ARS. La suma debe coincidir

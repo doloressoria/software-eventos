@@ -210,7 +210,7 @@ export type CateringItemRow = Pick<
   "id" | "categoria" | "descripcion" | "precio_unitario" | "categorias_pax"
 >;
 
-export type CateringDetalle = CateringRow & {
+export type CateringDetalle = CateringRow & import("./coberturas").FiscalCatering & {
   eventos: EventoResumen | null;
   salones: Pick<Tables<"salones">, "nombre"> | null;
   usuarios: Pick<Tables<"usuarios">, "full_name" | "email"> | null;

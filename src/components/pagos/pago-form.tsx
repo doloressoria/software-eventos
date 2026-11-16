@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/form";
 import type { ImputacionDestino, PagoFormState } from "@/lib/pagos/validation";
 import { PagoMoneyFields } from "@/components/pagos/pago-money-fields";
+import { moneyCents, moneyText } from "@/lib/catering/cobro-calculos";
 import { cantidadPax, totalVistaPrevia, type OpcionCobertura } from "@/lib/catering/coberturas";
 import { categoriasPax, type CategoriaPax } from "@/lib/eventos/asistentes";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -100,33 +101,44 @@ function ModoPagoFields({ state, destinos, coberturas }: {
   const id = useId();
   const [modo, setModo] = useState("importe");
   const [cateringId, setCateringId] = useState(coberturas?.[0]?.id ?? "");
+  const [iva, setIva] = useState("0");
+  const [capitalExtra, setCapitalExtra] = useState("0");
   const [cantidades, setCantidades] = useState<Partial<Record<CategoriaPax, string>>>({});
   const opciones = coberturas ?? [];
   const catering = opciones.find((option) => option.id === cateringId) ?? opciones[0];
   const porPersonas = modo === "personas" && catering;
   const tarifas = catering?.tarifas ?? [];
-  const coberturaTotal = porPersonas ? totalVistaPrevia(tarifas, cantidades) : undefined;
+  const separado = catering?.fiscal?.version_calculo === 2;
+  const capitalPax = totalVistaPrevia(tarifas, cantidades);
+  const extraCents = moneyCents(capitalExtra);
+  const ivaCents = moneyCents(iva);
+  const coberturaTotal = porPersonas ? capitalPax + (separado ? Number((extraCents ?? BigInt(0)) + (ivaCents ?? BigInt(0))) / 100 : 0) : undefined;
+  const ivaDisponible = Math.max((catering?.fiscal?.iva_pendiente ?? 0) - (catering?.fiscal?.iva_reservado ?? 0), 0);
 
   return <>
-    {opciones.length > 0 && <fieldset className="md:col-span-2">
+    {opciones.length > 0 && <fieldset key={modo} className="md:col-span-2">
       <legend className="mb-2 text-sm font-medium">Modo de pago</legend>
       <div className="flex flex-wrap gap-4">
         <label className="flex items-center gap-2 text-sm"><input type="radio" name="modo_pago" value="importe" checked={modo === "importe"} onChange={() => setModo("importe")} /> Pagar por importe</label>
-        <label className="flex items-center gap-2 text-sm"><input type="radio" name="modo_pago" value="personas" checked={modo === "personas"} onChange={() => setModo("personas")} /> Pagar por personas</label>
+        <label className="flex items-center gap-2 text-sm"><input type="radio" name="modo_pago" value="personas" checked={modo === "personas"} onChange={() => setModo("personas")} /> Capital / PAX e IVA</label>
       </div>
     </fieldset>}
     {porPersonas && <fieldset className="grid gap-4 rounded-lg border p-4 md:col-span-2 sm:grid-cols-2">
-      <legend className="px-1 text-sm font-medium">Personas a cubrir</legend>
+      <legend className="px-1 text-sm font-medium">{separado ? "Capital e IVA a cancelar" : "Personas a cubrir · modelo histórico con IVA incluido"}</legend>
+      <input type="hidden" name="version_calculo" value={separado ? "2" : "1"} />
+      <input type="hidden" name="cobertura_catering" value={catering.id} />
       {opciones.length > 1 ? <div className="sm:col-span-2">
         <Label htmlFor={`${id}-catering`}>Catering</Label>
-        <Select name="cobertura_catering" value={catering.id} onValueChange={(value) => {
+        <Select value={catering.id} onValueChange={(value) => {
           setCateringId(value);
           setCantidades({});
+          setIva("0");
+          setCapitalExtra("0");
         }}>
           <SelectTrigger id={`${id}-catering`}><SelectValue /></SelectTrigger>
           <SelectContent>{opciones.map((opcion) => <SelectItem key={opcion.id} value={opcion.id}>{opcion.label}</SelectItem>)}</SelectContent>
         </Select>
-      </div> : <input type="hidden" name="cobertura_catering" value={catering.id} />}
+      </div> : null}
       {categoriasPax.map(([categoria, label]) => {
         const tarifa = tarifas.find((t) => t.categoria === categoria);
         const precio = tarifa?.precio_aplicado ?? 0;
@@ -140,13 +152,27 @@ function ModoPagoFields({ state, destinos, coberturas }: {
             onChange={(e) => setCantidades((current) => ({ ...current, [categoria]: e.target.value }))} />
           <input type="hidden" name={`aplicado_${categoria}`} value={precio.toFixed(2)} />
           <p id={`${id}-${categoria}-detalle`} className="mt-1 text-xs text-slate-600">
-            {currency.format(precio)} por persona con IVA · {maximo} disponibles
+            {currency.format(precio)} por persona {separado ? "de capital sin IVA" : "con IVA"} · {maximo} disponibles
             {cantidad > 0 && ` · ${currency.format(cantidad * precio)}`}
           </p>
         </div>;
       })}
-      <p className="text-sm font-medium sm:col-span-2" aria-live="polite">Importe por personas: {currency.format(coberturaTotal ?? 0)}</p>
+      {separado && <>
+        <div>
+          <Label htmlFor={`${id}-capital-extra`}>Otro capital por importe (ARS)</Label>
+          <Input id={`${id}-capital-extra`} name="capital_extra_ars" type="number" min="0" max="9999999999.99" step="0.01" value={capitalExtra} onChange={e => setCapitalExtra(e.target.value)} />
+          <p className="mt-1 text-xs text-slate-600">Cargos fijos, comisión, su IVA o anticipo: reduce deuda sin cubrir PAX.</p>
+        </div>
+        <div>
+          <Label htmlFor={`${id}-iva`}>IVA catering a cancelar (ARS)</Label>
+          <Input id={`${id}-iva`} name="iva_ars" type="number" min="0" max={ivaDisponible} step="0.01" value={iva} onChange={e => setIva(e.target.value)} />
+          <button type="button" className="mt-1 text-xs underline" onClick={() => setIva(moneyText(moneyCents(ivaDisponible.toFixed(2))!))}>Incluir todo el IVA disponible: {currency.format(ivaDisponible)}</button>
+          <p className="mt-1 text-xs text-slate-600">Podés cobrar sólo IVA, sólo capital o ambos. El IVA no cubre personas.</p>
+        </div>
+      </>}
+      <p className="text-sm font-medium sm:col-span-2" aria-live="polite">Objetivo a cancelar: {currency.format(coberturaTotal ?? 0)}</p>
     </fieldset>}
+    {!porPersonas && catering?.fiscal?.version_calculo === 2 && <p className="text-xs text-slate-600 md:col-span-2">Los importes destinados a catering se registran como capital sin cobertura de PAX. Para identificar IVA, elegí Capital / PAX e IVA.</p>}
     <PagoMoneyFields key={JSON.stringify([state.fields, state.imputaciones, state.solicitudConfirmada, state.successMessage])}
       state={state} coberturaTotal={coberturaTotal}>
       {!porPersonas && destinos ? (equivalent) => (

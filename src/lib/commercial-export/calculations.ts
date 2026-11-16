@@ -43,7 +43,7 @@ export function cateringAmounts(data: CateringExportData) {
     paid: sumOrdinaryPayments(payments),
     storedPaid: toMoneyNumber(c.total_pagado),
     detailBalance,
-    incomeBalance: Math.max(detailBalance, 0),
+    incomeBalance: detailBalance,
     guarantees: sumGuarantees(payments),
     difference: roundMoney(storedTotal - calculatedTotal),
   };

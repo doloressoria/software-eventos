@@ -25,7 +25,7 @@ export type FlujoPago = Pick<
   | "importe_moneda_original"
   | "moneda"
   | "notas"
->;
+> & { catering_cobro_componentes: Tables<"catering_cobro_componentes">[] };
 
 export type FlujoEgreso = Pick<
   Tables<"egresos">,
@@ -147,7 +147,7 @@ export async function getEventoFlujoDinero(
     supabase
       .from("pagos")
       .select(
-        "id, catering_contrato_id, concepto, created_at, distribuido, es_garantia, evento_servicio_id, fecha_pago, forma_pago, tipo_cambio, importe_en_pesos, importe_moneda_original, moneda, notas",
+        "id, catering_contrato_id, concepto, created_at, distribuido, es_garantia, evento_servicio_id, fecha_pago, forma_pago, tipo_cambio, importe_en_pesos, importe_moneda_original, moneda, notas, catering_cobro_componentes(*)",
       )
       .eq("evento_id", evento.id)
       .is("deleted_at", null)
@@ -227,7 +227,7 @@ export async function getEventoFlujoDinero(
     payments: pagos,
   });
   const saldoPendienteCobro =
-    totalEvento === null ? null : Math.max(roundMoney(totalEvento + (resumen?.ajuste_cobertura_catering ?? 0) - totalIngresos), 0);
+    totalEvento === null ? null : roundMoney(totalEvento + (resumen?.ajuste_cobertura_catering ?? 0) - totalIngresos);
   const serviciosResumen = getServiciosResumen(
     servicios,
     egresos,

@@ -23,6 +23,8 @@ export type CateringFormFields = ReturnType<typeof camposPreciosCategoria> & {
   comision_organizador_monto: string;
   iva_comision: string;
   iva_porcentaje: string;
+  porcentaje_facturado: string;
+  version_calculo: string;
   notas: string;
   precio_unitario_inicial: string;
   precio_motivo_inicial: string;
@@ -56,6 +58,8 @@ export type CateringPayload = {
   comision_organizador_monto: number;
   iva_comision: number;
   iva_porcentaje: number;
+  porcentaje_facturado: number;
+  version_calculo: number;
   notas: string | null;
   precio_unitario_inicial: number;
   precio_motivo_inicial: string | null;
@@ -82,6 +86,8 @@ export function getEmptyCateringFormState(): CateringFormState {
       comision_organizador_monto: "0",
       iva_comision: "0",
       iva_porcentaje: "21",
+      porcentaje_facturado: "100",
+      version_calculo: "2",
       notas: "",
       ...camposPreciosCategoria({}),
       precio_unitario_inicial: "",
@@ -117,6 +123,8 @@ export function getCateringFormStateFromCatering(
       ),
       iva_comision: formatFormNumber(rateToPercentage(catering.iva_comision ?? 0)),
       iva_porcentaje: formatFormNumber(rateToPercentage(catering.iva_porcentaje ?? 0)),
+      porcentaje_facturado: String(catering.porcentaje_facturado),
+      version_calculo: String(catering.version_calculo),
       notas: catering.notas ?? "",
       ...camposPreciosCategoria({}),
       precio_unitario_inicial: "",
@@ -213,6 +221,11 @@ export function validateCateringForm(
     errors,
   );
 
+  const porcentajeFacturado = parseOptionalPercentage(fields.porcentaje_facturado, "porcentaje_facturado", errors);
+  if (!/^\d{1,3}(?:[.,]\d{1,2})?$/.test(fields.porcentaje_facturado)) {
+    errors.porcentaje_facturado = "Ingresá un porcentaje entre 0 y 100, con hasta 2 decimales.";
+  }
+  if (!["1", "2"].includes(fields.version_calculo)) errors.version_calculo = "Seleccioná un modelo válido.";
   let precioUnitarioInicial = 0;
   const precioMotivoInicial = nullableTrim(fields.precio_motivo_inicial);
 
@@ -262,6 +275,8 @@ export function validateCateringForm(
       comision_organizador_monto: comisionMonto ?? 0,
       iva_comision: percentageToRate(ivaComisionPct ?? 0),
       iva_porcentaje: percentageToRate(ivaPorcentajePct ?? 0),
+      porcentaje_facturado: porcentajeFacturado ?? 100,
+      version_calculo: Number(fields.version_calculo),
       notas: nullableTrim(fields.notas),
       preciosCategoria,
       precio_unitario_inicial: precioUnitarioInicial,
@@ -290,6 +305,8 @@ function getCateringFields(formData: FormData): CateringFormFields {
     comision_organizador_monto: getString(formData, "comision_organizador_monto"),
     iva_comision: getString(formData, "iva_comision"),
     iva_porcentaje: getString(formData, "iva_porcentaje"),
+    porcentaje_facturado: getString(formData, "porcentaje_facturado") || "100",
+    version_calculo: formData.get("activar_modelo_separado") === "on" ? "2" : getString(formData, "version_calculo") || "1",
     notas: getString(formData, "notas"),
     ...camposPreciosCategoria(formData),
     precio_unitario_inicial: getString(formData, "precio_unitario_inicial"),

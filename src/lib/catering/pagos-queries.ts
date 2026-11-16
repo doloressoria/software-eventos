@@ -1,4 +1,4 @@
-import type { CoberturaPax, TarifaPax } from "@/lib/catering/coberturas";
+import type { CoberturaPax, TarifaPax, FiscalCatering, ComponenteCatering } from "@/lib/catering/coberturas";
 import { calculatePaymentSummary, toMoneyNumber, type EstadoCobro } from "@/lib/pagos/calculos";
 import { createClient } from "@/lib/supabase/server";
 import { logSupabaseError } from "@/lib/supabase/errors";
@@ -30,6 +30,8 @@ export type CateringIngresos = {
   tarifas: TarifaPax[];
   coberturas: CoberturaPax[];
   pagos: PagoCatering[];
+  fiscal: FiscalCatering | null;
+  componentes: ComponenteCatering[];
   saldoPendiente: number;
   totalCobrado: number;
   totalCatering: number;
@@ -39,7 +41,7 @@ export async function getCateringIngresos(
   cateringContratoId: string,
 ): Promise<CateringIngresos> {
   const supabase = await createClient();
-  const [pagosResult, cateringResult, tarifasResult, coberturasResult] = await Promise.all([
+  const [pagosResult, cateringResult, tarifasResult, coberturasResult, componentesResult] = await Promise.all([
     supabase
       .from("v_pago_imputaciones")
       .select(
@@ -51,11 +53,12 @@ export async function getCateringIngresos(
       .order("created_at", { ascending: false }),
     supabase
       .from("v_catering_acreditado")
-      .select("total_con_iva, total_pagado, saldo_pendiente")
+      .select("*")
       .eq("id", cateringContratoId)
       .maybeSingle(),
     supabase.from("v_catering_tarifas").select("*").eq("catering_contrato_id", cateringContratoId),
     supabase.from("catering_coberturas").select("*").eq("catering_contrato_id", cateringContratoId).order("pago_id"),
+    supabase.from("catering_cobro_componentes").select("*").eq("catering_contrato_id", cateringContratoId),
   ]);
 
   if (pagosResult.error) {
@@ -68,7 +71,7 @@ export async function getCateringIngresos(
     throw new Error("No se pudo obtener el total del catering.");
   }
 
-  if (tarifasResult.error || coberturasResult.error) {
+  if (tarifasResult.error || coberturasResult.error || componentesResult.error) {
     throw new Error("No se pudo obtener la cobertura por personas.");
   }
 
@@ -79,9 +82,11 @@ export async function getCateringIngresos(
   return {
     estadoCobro: summary.estadoCobro,
     pagos,
+    fiscal: cateringResult.data,
+    componentes: componentesResult.data,
     tarifas: tarifasResult.data,
     coberturas: coberturasResult.data,
-    saldoPendiente: summary.saldoPendiente,
+    saldoPendiente: toMoneyNumber(cateringResult.data?.saldo_pendiente),
     totalCobrado: toMoneyNumber(cateringResult.data?.total_pagado),
     totalCatering: summary.totalEvento,
   };

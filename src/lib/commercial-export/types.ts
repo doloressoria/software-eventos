@@ -17,7 +17,7 @@ export type ExportEvent = Tables<"eventos"> & {
 export type ExportService = Tables<"evento_servicios"> & {
   servicios_catalogo: { nombre: string; categoria: string } | null;
 };
-export type ExportCatering = Tables<"catering_contratos"> & {
+export type ExportCatering = Tables<"catering_contratos"> & Partial<import("../catering/coberturas").FiscalCatering> & {
   usuarios: { full_name: string | null; email: string } | null;
   salones: { nombre: string } | null;
 };
@@ -45,6 +45,7 @@ export type CateringExportData = CateringSummary & {
   costos: Tables<"v_catering_costos">;
   tarifas: Tables<"v_catering_tarifas">[];
   coberturas: Tables<"catering_coberturas">[];
+  componentes: Tables<"catering_cobro_componentes">[];
 };
 export type PaymentHistoryExportData = {
   kind: "pagos";

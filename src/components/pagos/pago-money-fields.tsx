@@ -4,6 +4,7 @@ import { useId, useState, type ReactNode } from "react";
 import { DatePickerField } from "@/components/ui/date-picker-field";
 import { FieldError, Input, Label } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cateringRounding, recommendedUsd } from "@/lib/catering/cobro-calculos";
 import { pagoFormaPagoOptions, paymentEquivalent, type PagoFormState } from "@/lib/pagos/validation";
 
 export function PagoMoneyFields({ state, children, coberturaTotal }: {
@@ -19,7 +20,15 @@ export function PagoMoneyFields({ state, children, coberturaTotal }: {
   const rate = moneda === "ARS" ? "1" : cotizacion;
   const porPersonas = coberturaTotal !== undefined;
   const importePorPersonas = porPersonas && moneda === "ARS";
-  const importe = importePorPersonas ? (coberturaTotal > 0 ? coberturaTotal.toFixed(2) : "") : monto;
+  const target = coberturaTotal?.toFixed(2) ?? "0";
+  const signature = `${target}:${rate}`;
+  const [usdDraft, setUsdDraft] = useState<{ signature: string; value: string } | null>(
+    state.formError && state.fields.moneda === "USD" ? { signature, value: state.fields.monto } : null,
+  );
+  const suggested = porPersonas && moneda === "USD" ? recommendedUsd(target, rate) : null;
+  const importe = importePorPersonas ? (coberturaTotal > 0 ? target : "")
+    : porPersonas && moneda === "USD" ? (usdDraft?.signature === signature ? usdDraft.value : suggested ?? "") : monto;
+  const rounding = porPersonas ? cateringRounding(target, "0", importe, rate, moneda === "USD" ? "USD" : "ARS") : null;
   const equivalent = paymentEquivalent(importe, rate);
   const changeCurrency = (value: string) => {
     setMoneda(value);
@@ -61,7 +70,8 @@ export function PagoMoneyFields({ state, children, coberturaTotal }: {
     </div>
     <div>
       <Label htmlFor={`${id}-monto`}>Importe original ({moneda})</Label>
-      <Input id={`${id}-monto`} name="monto" type="number" min="0.01" step="0.01" required value={importe} readOnly={importePorPersonas} onChange={e => setMonto(e.target.value)} aria-invalid={Boolean(state.errors.monto)} aria-describedby={state.errors.monto ? `${id}-monto-error` : undefined} />
+      <Input id={`${id}-monto`} name="monto" type="number" min="0.01" step="0.01" required value={importe} readOnly={importePorPersonas} onChange={e => { setMonto(e.target.value); setUsdDraft({ signature, value: e.target.value }); }} aria-invalid={Boolean(state.errors.monto)} aria-describedby={state.errors.monto ? `${id}-monto-error` : undefined} />
+      {suggested && <button type="button" className="mt-1 text-xs underline" onClick={() => setUsdDraft({ signature, value: suggested })}>Usar USD recomendado: {suggested}</button>}
       {state.errors.monto && <FieldError id={`${id}-monto-error`}>{state.errors.monto}</FieldError>}
     </div>
     <div>
@@ -72,6 +82,10 @@ export function PagoMoneyFields({ state, children, coberturaTotal }: {
     <p className="md:col-span-2 text-sm font-medium" aria-live="polite">
       Equivalente en pesos: {equivalent === null ? "Ingresá importe y cotización" : new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(equivalent)}
     </p>
+    {porPersonas && moneda === "USD" && <p className="md:col-span-2 text-sm" aria-live="polite">
+      {rounding ? `Ajuste de redondeo (no es ingreso): ${new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(rounding.adjustment)}. Objetivo = equivalente real + ajuste.`
+        : "El importe USD debe ser el recomendado al centavo para cancelar este objetivo. Para otro monto, usá pago por importe."}
+    </p>}
     <div>
       <Label htmlFor={`${id}-banco`}>Banco / referencia de transferencia</Label>
       <Input id={`${id}-banco`} name="banco" defaultValue={state.fields.banco} />
