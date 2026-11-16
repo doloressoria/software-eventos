@@ -203,7 +203,7 @@ Orden de activación (compatibilidad del frontend primero):
 2. Guardar inventario y ejecutar la verificación de sólo lectura
    [recibo-formato-talonario.sql](../supabase/verification/recibo-formato-talonario.sql).
 3. Aplicar completo, con BEGIN/COMMIT,
-   [20261116224116_recibo_formato_talonario.sql](../supabase/migrations/20261116224116_recibo_formato_talonario.sql).
+   [20261116230238_recibo_formato_talonario.sql](../supabase/migrations/20261116230238_recibo_formato_talonario.sql).
    Sólo reemplaza el constructor privado del snapshot: futuras emisiones,
    previews y comprobantes vinculados reciben versión 2. Reintentar una emisión
    previa devuelve su original versión 1.
@@ -218,3 +218,13 @@ importes, límites de página y una fila de 8.000 caracteres (incluida su repeti
 en el desglose), sin omitir caracteres. No se agregaron dependencias ni se cambió
 el cálculo de caja/deuda. No hacer rollback a un frontend que rechace versión 2
 tras activarla; conservar el soporte de ambos formatos.
+
+Activación completada: el frontend compatible del commit `5fa78d39` quedó READY
+en Vercel antes de aplicar la migración **20261116230238** mediante Supabase.
+El archivo se alineó al identificador asignado por el conector, sin cambiar su
+contenido después de aplicarlo. La verificación confirmó constructor versión 2,
+categoría real y función privada; las huellas de recibos y datos financieros
+coincidieron antes/después. Los tipos oficiales se regeneraron y no presentan
+cambios en la interfaz pública, que sigue devolviendo JSON. La CLI local sigue
+requiriendo Docker. Los advisors no agregaron avisos. No se emitieron cobros de
+prueba en producción ni se modificó ninguna configuración de marca.

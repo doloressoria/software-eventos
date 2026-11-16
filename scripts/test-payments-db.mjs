@@ -84,7 +84,7 @@ try {
           readFileSync("supabase/migrations/20261116222142_recibos_persistentes_y_excedentes.sql", "utf8").replace(/^begin;\n|\ncommit;\n$/g, ""),
           readFileSync("supabase/tests/recibos.sql", "utf8"),
           "create temporary table recibos_v1_antes as select id,snapshot,fuente from public.recibos;",
-          readFileSync("supabase/migrations/20261116224116_recibo_formato_talonario.sql", "utf8").replace(/^begin;\n|^commit;\n/gm, ""),
+          readFileSync("supabase/migrations/20261116230238_recibo_formato_talonario.sql", "utf8").replace(/^begin;\n|^commit;\n/gm, ""),
           readFileSync("supabase/tests/recibo-talonario.sql", "utf8"),
           readFileSync("supabase/verification/postflight-recibos.sql", "utf8"),
         ] : []),
