@@ -128,3 +128,43 @@ test("acción de cobro valida USD exacto antes de RPC, persiste desglose y conse
   assert.equal((writes.at(-1)!.p_cabecera as Record<string,unknown>).capital_ars,"0.00");
   assert.equal((writes.at(-1)!.p_coberturas as unknown[]).length,0);
 });
+
+import { totalesCobertura, importeReasignable, type ComponenteCatering, type TarifaPax } from "./coberturas";
+test("totales PAX suman categorías y dinero en centavos, sin sumar tarifas ni duplicar cheques", () => {
+  const total = totalesCobertura([
+    { pax: 100, cubiertos: 90, por_acreditar: 5, pendientes: 10, excedente: 0, saldo_categoria: 100.01, precio_aplicado: 10 },
+    { pax: 20, cubiertos: 22, por_acreditar: 0, pendientes: 0, excedente: 2, saldo_categoria: .02, precio_aplicado: 50 },
+  ] as TarifaPax[]);
+  assert.deepEqual(total, { pax: 120, cubiertos: 112, por_acreditar: 5, pendientes: 10, excedente: 2, saldo_categoria: 100.03 });
+  assert.deepEqual(totalesCobertura([]), { pax: 0, cubiertos: 0, por_acreditar: 0, pendientes: 0, excedente: 0, saldo_categoria: 0 });
+});
+test("preview de excedente limita dinero real disponible sin IVA ni ajustes como ingreso", () => {
+  const d = { capital_ars: 100000, objetivo_ars: 121000, iva_ars: 21000, ajuste_ars: 4, ajuste_iva_ars: 1, capital_reasignado_ars: 90000 } as ComponenteCatering;
+  assert.equal(importeReasignable(1, 10000, d), 9997);
+  assert.equal(importeReasignable(1, 1000.01), 1000.01);
+});
+
+import { createElement, type ComponentType } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import * as jsxRuntime from "react/jsx-runtime";
+import { categoriasPax } from "../eventos/asistentes";
+test("resumen real renderiza Total, cantidades por tarifa y explicación de cheques", () => {
+  const compile = (path: string, dependencies: Record<string, unknown>) => {
+    const exports: Record<string, unknown> = {};
+    runInNewContext(ts.transpileModule(readFileSync(path,"utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText,
+      { exports, require: (name: string) => dependencies[name] });
+    return exports;
+  };
+  const table = compile("src/components/ui/table.tsx", { "react/jsx-runtime": jsxRuntime, "@/utils/cn": { cn: (...classes: unknown[]) => classes.filter(Boolean).join(" ") } });
+  const ui = compile("src/components/catering/cobertura-resumen.tsx", { "react/jsx-runtime": jsxRuntime, "@/components/ui/table": table,
+    "@/lib/catering/coberturas": coberturasModule, "@/lib/eventos/asistentes": { categoriasPax } });
+  const html = renderToStaticMarkup(createElement(ui.CoberturaResumen as ComponentType<{ tarifas: TarifaPax[] }>, {
+    tarifas: [{ categoria: "adultos", version_calculo: 2, pax: 4, cubiertos: 2, por_acreditar: 1, pendientes: 2, excedente: 0,
+      saldo_categoria: 1800, precio_base: 800, adicional_unitario: 100, precio_aplicado: 900 } as TarifaPax],
+  }));
+  const total = html.split("<tr").find(row => row.includes(">Total<"))!.replace(/<[^>]+>/g," ").replace(/\s+/g," ");
+  assert.match(total, /Total 4 2 1 2 0/);
+  assert.ok(html.includes("incluido en Pendientes"));
+  assert.ok(html.includes("capital sin IVA"));
+  assert.ok(html.includes("Cantidad × tarifa vigente"));
+});

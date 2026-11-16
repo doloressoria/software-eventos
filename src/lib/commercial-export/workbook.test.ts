@@ -334,3 +334,19 @@ test("catering separado exporta IVA, ajuste USD y caja sin duplicar componentes"
   assert.equal(amount(book,"DC","Cobros ordinarios registrados",8),99996);
   assert.ok(texts(book).includes("DESGLOSE HISTÓRICO DE COBROS (NO SUMAR A INGRESOS)"));
 });
+
+test("fila Total de PAX concilia con categorías y nunca suma precios unitarios", async () => {
+  const data = examplePaymentHistory();
+  const book = await buildCommercialWorkbook(data);
+  const tarifas = data.ingresos.coberturas.flatMap(c => c.tarifas);
+  let found = false;
+  book.getWorksheet("PAX")!.eachRow(r => {
+    if (r.getCell(2).value !== "Total") return;
+    found = true;
+    assert.equal(r.getCell(4).value, tarifas.reduce((sum, t) => sum + (t.pax ?? 0), 0));
+    assert.equal(r.getCell(6).value, tarifas.reduce((sum, t) => sum + (t.por_acreditar ?? 0), 0));
+    assert.equal(r.getCell(9).value, tarifas.reduce((sum, t) => sum + (t.saldo_categoria ?? 0), 0));
+    assert.equal(r.getCell(10).value, null);
+  });
+  assert.ok(found);
+});

@@ -1460,6 +1460,126 @@ export type Database = {
           },
         ]
       }
+      recibo_emisores: {
+        Row: {
+          id: string
+          logo_data_url: string | null
+          marca: string
+          salon_id: string | null
+        }
+        Insert: {
+          id?: string
+          logo_data_url?: string | null
+          marca: string
+          salon_id?: string | null
+        }
+        Update: {
+          id?: string
+          logo_data_url?: string | null
+          marca?: string
+          salon_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recibo_emisores_salon_id_fkey"
+            columns: ["salon_id"]
+            isOneToOne: true
+            referencedRelation: "salones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recibos: {
+        Row: {
+          anterior_id: string | null
+          catering_contrato_id: string | null
+          emitido_at: string
+          emitido_por: string | null
+          evento_id: string | null
+          fuente: Json
+          id: string
+          numero: number
+          pago_id: string
+          revision: number
+          serie: string
+          snapshot: Json
+          tipo: string
+        }
+        Insert: never
+        Update: never
+        Relationships: [
+          {
+            foreignKeyName: "recibos_anterior_id_fkey"
+            columns: ["anterior_id"]
+            isOneToOne: true
+            referencedRelation: "recibos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recibos_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "catering_contratos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recibos_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "v_catering_acreditado"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recibos_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "v_catering_costos"
+            referencedColumns: ["catering_contrato_id"]
+          },
+          {
+            foreignKeyName: "recibos_catering_contrato_id_fkey"
+            columns: ["catering_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "v_catering_tarifas"
+            referencedColumns: ["catering_contrato_id"]
+          },
+          {
+            foreignKeyName: "recibos_emitido_por_fkey"
+            columns: ["emitido_por"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recibos_evento_id_fkey"
+            columns: ["evento_id"]
+            isOneToOne: false
+            referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recibos_evento_id_fkey"
+            columns: ["evento_id"]
+            isOneToOne: false
+            referencedRelation: "v_anticipacion_reserva"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recibos_evento_id_fkey"
+            columns: ["evento_id"]
+            isOneToOne: false
+            referencedRelation: "v_resumen_evento"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recibos_pago_id_fkey"
+            columns: ["pago_id"]
+            isOneToOne: false
+            referencedRelation: "pagos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_permissions: {
         Row: {
           can_manage: boolean
@@ -2183,6 +2303,7 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["rol_usuario"]
       }
+      emitir_recibo: { Args: { p_pago: string }; Returns: string }
       evento_contactos_contexto: {
         Args: { p_evento_id: string }
         Returns: {
@@ -2254,6 +2375,7 @@ export type Database = {
           saldo_proyectado: number
         }[]
       }
+      previsualizar_recibo: { Args: { p_pago: string }; Returns: Json }
       programar_ipc: {
         Args: {
           p_fecha_vigencia: string
@@ -2262,18 +2384,32 @@ export type Database = {
         }
         Returns: string
       }
-      reasignar_excedente_catering: {
-        Args: {
-          p_cantidad: number
-          p_categoria: string
-          p_catering: string
-          p_destino: string
-          p_es_catering: boolean
-          p_liberada_esperada: number
-          p_pago: string
-        }
-        Returns: undefined
-      }
+      reasignar_excedente_catering:
+        | {
+            Args: {
+              p_cantidad: number
+              p_categoria: string
+              p_catering: string
+              p_destino: string
+              p_es_catering: boolean
+              p_liberada_esperada: number
+              p_pago: string
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_cantidad: number
+              p_categoria: string
+              p_catering: string
+              p_destino: string
+              p_es_catering: boolean
+              p_importe_esperado: number
+              p_liberada_esperada: number
+              p_pago: string
+            }
+            Returns: undefined
+          }
       recalcular_fecha_contrato_evento: {
         Args: { p_evento_id: string }
         Returns: undefined

@@ -1,3 +1,5 @@
+import { RecibosEmitidos } from "@/components/recibos/recibos-emitidos";
+import Link from "next/link";
 import { CateringFiscalResumen, CobroDesglose, CoberturaDetalle, CoberturaResumen } from "@/components/catering/cobertura-resumen";
 import { ReasignarExcedenteForm } from "@/components/catering/reasignar-excedente-form";
 import { isChequePending } from "@/lib/pagos/calculos";
@@ -65,6 +67,7 @@ export function IngresosEventoSection({
         </Badge>
       </CardHeader>
       <CardContent className="space-y-8">
+        <RecibosEmitidos kind="eventos" id={eventoId} />
         <dl className="grid gap-4 md:grid-cols-3">
           <SummaryItem
             label={ingresos.coberturas.length ? "Total a precios vigentes" : "Total evento"}
@@ -136,10 +139,10 @@ export function IngresosEventoSection({
                           return <div key={cobertura.categoria} className="mt-2 text-sm">
                             <CoberturaDetalle cobertura={cobertura} />
                             {gestionaEventos && (admin || pago.registrado_por === actorId) && maximo > 0
-                              && elegibles.length > 0 && tarifa?.tarifas_historicas === 1 && !isChequePending(pago) && (
+                              && elegibles.length > 0 && !isChequePending(pago) && (
                               <ReasignarExcedenteForm key={cobertura.liberada}
                                 action={reasignarExcedenteAction.bind(null, eventoId, pago.id, cobertura.catering_contrato_id, cobertura.categoria, cobertura.liberada)}
-                                destinos={elegibles} maximo={maximo} precio={cobertura.precio_aplicado} />
+                                destinos={elegibles} maximo={maximo} precio={cobertura.precio_aplicado} componente={pago.catering_cobro_componentes.find(d => d.catering_contrato_id === cobertura.catering_contrato_id)} />
                             )}
                           </div>;
                         })}
@@ -152,6 +155,7 @@ export function IngresosEventoSection({
                         {pago.notas ?? "-"}
                       </TableCell>
                       <TableCell className="text-right">
+                        <Link className="mb-3 block text-sm underline" href={`/eventos/${eventoId}/ingresos/recibos/${pago.id}`}>Ver / emitir recibo</Link>
                         {pago.catering_coberturas.length === 0 && !(pago.catering_cobro_componentes ?? []).some(d => d.explicito) && <details className="mb-3 text-left">
                           <summary className="cursor-pointer text-sm">Editar pago</summary>
                           <div className="min-w-72 p-3">

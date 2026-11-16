@@ -1,3 +1,4 @@
+import { RecibosEmitidos } from "@/components/recibos/recibos-emitidos";
 import Link from "next/link";
 import { CateringFiscalResumen, CobroDesglose, CoberturaDetalle, CoberturaResumen } from "@/components/catering/cobertura-resumen";
 import { PagoFechas } from "@/components/pagos/pago-fechas";
@@ -58,6 +59,7 @@ export function CateringIngresosSection({
         </Badge>
       </CardHeader>
       <CardContent className="space-y-8">
+        <RecibosEmitidos kind="catering" id={cateringId} />
         <dl className="grid gap-4 md:grid-cols-3">
           <SummaryItem label="Total a precios vigentes" value={formatCurrency(ingresos.totalCatering)} />
           <SummaryItem
@@ -122,6 +124,8 @@ export function CateringIngresosSection({
                         {pago.notas ?? "-"}
                       </TableCell>
                       <TableCell className="text-right">
+                        {pago.distribuido ? <p className="mb-2 text-xs">El recibo completo requiere acceso al evento y se emite desde sus Ingresos.</p>
+                          : <Link className="mb-3 block text-sm underline" href={eventoId ? `/eventos/${eventoId}/ingresos/recibos/${pago.pago_id}` : `/catering/${cateringId}/ingresos/recibos/${pago.pago_id}`}>Ver / emitir recibo</Link>}
                         {pago.distribuido ? (
                           <span className="text-sm">Se administra en Ingresos del evento</span>
                         ) : (

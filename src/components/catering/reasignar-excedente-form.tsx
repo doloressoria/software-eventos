@@ -7,19 +7,22 @@ import { SubmitButton } from "@/components/salones/submit-button";
 import { FormAlert, Input, Label } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ImputacionDestino } from "@/lib/pagos/validation";
+import { importeReasignable, type ComponenteCatering } from "@/lib/catering/coberturas";
 
-export function ReasignarExcedenteForm({ action, destinos, maximo, precio }: {
+export function ReasignarExcedenteForm({ action, destinos, maximo, precio, componente }: {
   action: (state: DeletePagoState, form: FormData) => Promise<DeletePagoState>;
   destinos: ImputacionDestino[];
   maximo: number;
   precio: number;
+  componente?: ComponenteCatering;
 }) {
   const [state, formAction, pending] = useActionState(action, {});
   const formRef = useRef<HTMLFormElement>(null);
   useExportForm(formRef, pending, !state.formError, state);
   const [cantidad, setCantidad] = useState(String(maximo));
   const id = useId();
-  const importe = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(Number(cantidad) * precio);
+  const disponible = importeReasignable(Number(cantidad), precio, componente);
+  const importe = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(disponible);
   return <details className="mt-2 rounded-md border p-2">
     <summary className="cursor-pointer text-sm font-medium">Reasignar excedente</summary>
     <form ref={formRef} action={formAction} className="mt-2 min-w-56 space-y-3">
@@ -28,7 +31,8 @@ export function ReasignarExcedenteForm({ action, destinos, maximo, precio }: {
         <Input id={`${id}-cantidad`} name="cantidad" type="number" min={1} max={maximo} step={1} required value={cantidad}
           onChange={(event) => setCantidad(event.target.value)} />
       </div>
-      <p className="text-xs text-slate-600" aria-live="polite">{importe} al precio histórico, dentro de este cobro.</p>
+      <input type="hidden" name="importe_esperado" value={disponible.toFixed(2)} />
+      <p className="text-xs text-slate-600" aria-live="polite">Origen: esta cobertura de este cobro, a tarifa histórica {precio}. Se transferirán {importe} reales, descontando ajustes y capital ya reasignado. El IVA permanece en el origen.</p>
       <div>
         <Label htmlFor={`${id}-destino`}>Destino del excedente</Label>
         <Select name="destino" required>

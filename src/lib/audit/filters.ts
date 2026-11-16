@@ -15,6 +15,8 @@ export const AUDITED_TABLES = [
   "eventos",
   "evento_servicios",
   "pagos",
+  "recibos",
+  "recibo_emisores",
   "pago_imputaciones",
   "egresos",
   "catering_contratos",

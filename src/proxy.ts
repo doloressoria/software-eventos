@@ -9,7 +9,8 @@ export async function proxy(request: NextRequest) {
   const { accessDenied, claims, isAdmin, permissions, response } = await updateSession(request);
   const isAuthenticated = Boolean(claims);
   const isExcelDownload = /^\/(eventos|catering)\/[^/]+\/(ingresos\/)?excel$/.test(pathname);
-  if (isExcelDownload) {
+  const isRecibo = /^\/(eventos|catering)\/[^/]+\/ingresos\/recibos\/[^/]+(\/pdf)?$/.test(pathname);
+  if (isExcelDownload || isRecibo) {
     const permission = getRequiredScreenPermission(pathname);
     const status = !isAuthenticated ? 401 : accessDenied || (!isAdmin && !permissions.some((p) => p.screen === permission?.screen)) ? 403 : null;
     if (status) {
@@ -18,6 +19,7 @@ export async function proxy(request: NextRequest) {
       response.cookies.getAll().forEach((cookie) => denied.cookies.set(cookie.name, cookie.value, cookie));
       return denied;
     }
+    return response;
   }
 
   if (accessDenied) {

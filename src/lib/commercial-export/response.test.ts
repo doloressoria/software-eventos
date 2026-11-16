@@ -71,7 +71,7 @@ test("descarga del historial entrega un XLSX adjuntable con nombre seguro y sald
 });
 
 test("proxy devuelve JSON 401/403 en las descargas y conserva las cookies de sesión", async () => {
-  for (const pathname of ["/catering/00000000-0000-4000-8000-000000000030/excel", "/eventos/00000000-0000-4000-8000-000000000001/ingresos/excel"]) {
+  for (const pathname of ["/catering/00000000-0000-4000-8000-000000000030/excel", "/eventos/00000000-0000-4000-8000-000000000001/ingresos/excel", "/eventos/evt/ingresos/recibos/pago/pdf", "/catering/ct/ingresos/recibos/pago/pdf"]) {
   for (const scenario of ["expired", "inactive", "wrong-screen"] as const) {
     let writtenCookies = 0;
     const loaded = load("src/proxy.ts", {
@@ -88,5 +88,18 @@ test("proxy devuelve JSON 401/403 en las descargas y conserva las cookies de ses
     assert.match(response.headers.get("cache-control")!, /no-store/);
     assert.equal(writtenCookies, 1);
   }
+  }
+});
+
+test("proxy permite lectura de Excel y recibos sin exigir gestión", async () => {
+  for (const pathname of ["/eventos/e/ingresos/excel", "/catering/c/ingresos/recibos/p", "/eventos/e/ingresos/recibos/p/pdf"]) {
+    const expected = { cookies: { getAll: () => [] } };
+    const loaded = load("src/proxy.ts", {
+      "@/lib/supabase/middleware": { updateSession: async () => ({ claims: { sub: "user" }, accessDenied: false, isAdmin: false,
+        permissions: [{ screen: pathname.startsWith("/eventos") ? "eventos" : "catering", can_manage: false }], response: expected }) },
+      "@/lib/roles/permissions": { getRequiredScreenPermission,getDefaultScreenPath },
+      "next/server": { NextResponse: { redirect: () => { throw new Error("No debe redirigir a un lector autorizado"); } } },
+    });
+    assert.equal(await loaded.proxy({ nextUrl: { pathname } }), expected);
   }
 });

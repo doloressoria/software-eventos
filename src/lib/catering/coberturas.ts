@@ -11,6 +11,23 @@ export type FiscalCatering = Pick<Tables<"v_catering_acreditado">,
 export type ComponenteCatering = Tables<"catering_cobro_componentes">;
 export type OpcionCobertura = { id: string; label: string; tarifas: TarifaPax[]; fiscal?: FiscalCatering };
 
+export function totalesCobertura(tarifas: TarifaPax[]) {
+  const total = { pax: 0, cubiertos: 0, por_acreditar: 0, pendientes: 0, excedente: 0, saldo_categoria: 0 };
+  for (const tarifa of tarifas) {
+    for (const key of ["pax", "cubiertos", "por_acreditar", "pendientes", "excedente"] as const) total[key] += tarifa[key] ?? 0;
+    total.saldo_categoria += Math.round((tarifa.saldo_categoria ?? 0) * 100);
+  }
+  total.saldo_categoria /= 100;
+  return total;
+}
+
+export function importeReasignable(cantidad: number, precio: number, componente?: ComponenteCatering) {
+  const nominal = cantidad * Math.round(precio * 100);
+  const disponible = componente ? Math.round(((componente.capital_ars ?? componente.objetivo_ars)
+    - (componente.ajuste_ars - componente.ajuste_iva_ars) - componente.capital_reasignado_ars) * 100) : nominal;
+  return Math.max(0, Math.min(nominal, disponible)) / 100;
+}
+
 export function cantidadPax(value: string) {
   const cantidad = Number(value);
   return /^\d{1,10}$/.test(value) && cantidad > 0 && cantidad <= 2147483647 ? cantidad : 0;

@@ -1,6 +1,6 @@
 import ExcelJS from "exceljs";
 import path from "node:path";
-import { nombreCategoria } from "../catering/coberturas";
+import { nombreCategoria, totalesCobertura } from "../catering/coberturas";
 import { categoriasPax } from "../eventos/asistentes";
 import { cateringAmounts, ordinaryPayments, PARTIAL_NOTICE, paymentAmount, SEPARATE_NOTICE, serviceAmounts, uniquePayments } from "./calculations";
 import { getArgentinaPaymentDay, isChequePending, roundMoney, sumGuarantees, sumOrdinaryPayments, toMoneyNumber } from "../pagos/calculos";
@@ -288,6 +288,10 @@ function cateringWorkbook(book: ExcelJS.Workbook, template: ExcelJS.Workbook, da
       for (const col of [2, 6, 7]) sheet.getCell(r, col).numFmt = "0";
       r++;
     }
+    const t = totalesCobertura(data.tarifas);
+    row(sheet, source, r++, 18, ["Total", t.pax, null, null, null, t.cubiertos, t.pendientes, t.saldo_categoria], 8);
+    note(sheet, source, r++, `Por acreditar (incluido en Pendientes): ${t.por_acreditar}. Excedentes: ${t.excedente}. Saldo PAX no incluye cargos fijos ni IVA separado.`, 8);
+    for (const t of data.tarifas) note(sheet, source, r++, `${nombreCategoria(t.categoria ?? "")}: ${t.pax ?? 0} × base ${money(t.precio_base ?? 0)} = ${money((t.pax ?? 0) * (t.precio_base ?? 0))}; ${t.pax ?? 0} × adicionales ${money(t.adicional_unitario ?? 0)} = ${money((t.pax ?? 0) * (t.adicional_unitario ?? 0))}; subtotal ${t.version_calculo === 2 ? "capital sin IVA" : "con IVA"} ${money((t.pax ?? 0) * (t.precio_aplicado ?? 0))}.`, 8);
   }
   const itemLabels: Record<string, string> = { alimentos: "Alimentos — ítem guardado", bebidas_alcoholicas: "Bebidas — ítem guardado", adicional_alimentos: "Adicional de alimentos", adicional_bebidas: "Adicional de bebidas", adicional_otros: "Adicional otros" };
   for (const item of data.items) {
@@ -470,7 +474,7 @@ function paymentHistoryWorkbook(book: ExcelJS.Workbook, template: ExcelJS.Workbo
   const pax = sheetFromTemplate(book, source, "PAX", 10);
   [9, 34, 18, 18, 18, 18, 18, 20, 22, 20].forEach((width, i) => { pax.getColumn(i + 1).width = width; });
   band(pax, source, 1, "COBERTURA POR CATEGORÍA", 10);
-  note(pax, source, 2, `Cobertura al ${ingresos.fechaSaldo}. Los PAX de cheques pendientes siguen por acreditar. El precio histórico aplicado se conserva aunque el catering se recotice. Los cobros por importe no se convierten a PAX.`, 10);
+  note(pax, source, 2, `Cobertura al ${ingresos.fechaSaldo}. Por acreditar está incluido en Pendientes; no se suma otra vez. Saldo PAX excluye cargos fijos y el IVA separado de versión 2. El precio histórico aplicado se conserva aunque el catering se recotice. Los cobros por importe no se convierten a PAX.`, 10);
   row(pax, source, 3, 42, [null, "Destino", "Categoría", "Contratados", "Cubiertos", "Por acreditar", "Pendientes", "Excedente", "Saldo PAX ARS", "Precio vigente ARS"], 10);
   r = 4;
   for (const c of ingresos.coberturas) for (const t of c.tarifas) {
@@ -478,6 +482,8 @@ function paymentHistoryWorkbook(book: ExcelJS.Workbook, template: ExcelJS.Workbo
     for (let col = 4; col <= 8; col++) pax.getCell(r, col).numFmt = "0";
     r++;
   }
+  const paxTotal = totalesCobertura(ingresos.coberturas.flatMap(c => c.tarifas));
+  row(pax, source, r++, 42, [null, "Total", null, paxTotal.pax, paxTotal.cubiertos, paxTotal.por_acreditar, paxTotal.pendientes, paxTotal.excedente, paxTotal.saldo_categoria, null], 10);
   band(pax, source, r++, "COBERTURA HISTÓRICA POR COBRO", 10);
   row(pax, source, r++, 42, ["Cobro", "Destino", "Categoría", "PAX originales", "Reasignados", "PAX vigentes", "Precio aplicado ARS", "Importe histórico ARS", "Importe vigente ARS", "Estado"], 10);
   let count = 0;

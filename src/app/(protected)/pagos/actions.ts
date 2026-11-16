@@ -7,6 +7,7 @@ import {
   getEmptyPagoFormState,
   type PagoFormState,
   paymentEquivalent,
+  parsePaymentDecimal,
   validateImputaciones,
   validatePagoForm,
 } from "@/lib/pagos/validation";
@@ -124,14 +125,16 @@ export async function reasignarExcedenteAction(
   const profile = await getCurrentProfile();
   if (!profile?.activo || !await getAuthorizedActiveEvento(eventoId, profile)) return { formError: "Reasignación no autorizada." };
   const cantidad = cantidadPax(String(formData.get("cantidad") ?? ""));
+  const importeEsperado = parsePaymentDecimal(String(formData.get("importe_esperado") ?? ""), 2, 10);
   const [tipo, destino, extra] = String(formData.get("destino") ?? "").split(":");
-  if (!cantidad || extra !== undefined || !destino || (tipo !== "servicio" && tipo !== "catering")) {
+  if (!cantidad || importeEsperado === null || extra !== undefined || !destino || (tipo !== "servicio" && tipo !== "catering")) {
     return { formError: "Ingresá la cantidad y elegí el destino del excedente." };
   }
   const supabase = await createClient();
   const { error } = await supabase.rpc("reasignar_excedente_catering", {
     p_catering: cateringId, p_pago: pagoId, p_categoria: categoria, p_cantidad: cantidad,
     p_destino: destino, p_es_catering: tipo === "catering", p_liberada_esperada: liberada,
+    p_importe_esperado: importeEsperado,
   });
   if (error) {
     logSupabaseError("reasignar excedente de catering", { code: error.code });

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
+import { createServer } from "node:net";
 import { execFileSync, spawnSync, spawn } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -15,8 +17,9 @@ const balances = process.argv.includes("--balances");
 const catering = process.argv.includes("--catering");
 const ipcCron = process.argv.includes("--ipc-cron");
 const ipc = ipcCron || process.argv.includes("--ipc");
+const recibos = process.argv.includes("--recibos");
 const detallePagos = process.argv.includes("--detalle-pagos");
-const cobertura = detallePagos || ipc || process.argv.includes("--cobertura");
+const cobertura = recibos || detallePagos || ipc || process.argv.includes("--cobertura");
 const imputaciones = cobertura || process.argv.includes("--imputaciones");
 const cheques = process.argv.includes("--cheques");
 const expenses = process.argv.includes("--expenses");
@@ -74,6 +77,13 @@ try {
           readFileSync("supabase/migrations/20261115231648_catering_iva_separado_usd.sql", "utf8")
             .replace(/^begin;\n|\ncommit;\n$/g, ""),
           readFileSync("supabase/tests/catering-fiscal.sql", "utf8"),
+        ] : []),
+        ...(recibos ? [
+          "create schema supabase_migrations; create table supabase_migrations.schema_migrations(version text,name text);",
+          readFileSync("supabase/verification/preflight-recibos.sql", "utf8"),
+          readFileSync("supabase/migrations/20261116222142_recibos_persistentes_y_excedentes.sql", "utf8").replace(/^begin;\n|\ncommit;\n$/g, ""),
+          readFileSync("supabase/tests/recibos.sql", "utf8"),
+          readFileSync("supabase/verification/postflight-recibos.sql", "utf8"),
         ] : []),
         "commit;",
       ] : ["rollback;"]),
@@ -154,9 +164,12 @@ try {
   if (cobertura) { checkIpcTypes(); await checkConcurrentFiscal(); }
   if (ipc) await checkConcurrentIpc();
   if (ipcCron) await checkIpcCron();
+  if (recibos) { await checkConcurrentRecibos(); checkReciboTypes(); }
+  if (recibos && process.argv.includes("--http")) await checkRecibosHttp();
   console.log("PostgreSQL: pruebas aprobadas; el cluster efímero se elimina al terminar.");
 } catch (error) {
   console.error(error.message);
+  if (!started && existsSync(join(dir,"server.log"))) console.error(readFileSync(join(dir,"server.log"),"utf8").trim());
   if (error.code === "ENOENT") {
     console.error("Requiere PostgreSQL 17 local (initdb, pg_ctl, psql); configurar PG_BIN si no están en PATH.");
   }
@@ -359,4 +372,103 @@ async function checkConcurrentFiscal() {
   assert.equal(run(`set eventos.test_dia='2026-11-21'; select total_pagado||'|'||saldo_pendiente||'|'||iva_pendiente from v_catering_acreditado where id='${contract}'`),"121000.00|0.00|0.00");
   assert.equal(run(`select count(*) from pagos where catering_contrato_id='${contract}'`),"2");
   console.log("Concurrencia real: un único cobro de IVA y una única cobertura PAX; los intentos simultáneos duplicados se rechazan.");
+}
+
+async function checkConcurrentRecibos() {
+  const args = ["-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-h", dir, "-p", "5432", "-U", "postgres", "-d", "postgres"];
+  const sql = `begin; set local role authenticated; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002',true);
+    select public.emitir_recibo('00000000-0000-0000-0000-000000001111'); select pg_sleep(.1); commit;`;
+  const results = await Promise.all([0,1].map(() => new Promise((resolve,reject) => {
+    const child = spawn(pg("psql"),[...args,"-c",sql]);
+    let stdout="", stderr="";
+    child.stdout.on("data",d=>stdout+=d); child.stderr.on("data",d=>stderr+=d);
+    child.on("error",reject); child.on("close",status=>status===0 ? resolve(stdout) : reject(new Error(stderr)));
+  })));
+  assert.equal(results[0],results[1]);
+  assert.equal(execFileSync(pg("psql"),[...args,"-c",`select count(*) from public.recibos where pago_id='00000000-0000-0000-0000-000000001111'`],{encoding:"utf8"}).trim(),"1");
+  console.log("Concurrencia real: dos emisiones devuelven el mismo recibo y una sola numeración.");
+}
+
+function checkReciboTypes() {
+  const args = ["-X","-q","-A","-t","-v","ON_ERROR_STOP=1","-h",dir,"-p","5432","-U","postgres","-d","postgres"];
+  const tables = JSON.parse(execFileSync(pg("psql"), [...args,"-c", `select json_agg(t) from (select table_name,array_agg(column_name order by column_name) as columns from information_schema.columns where table_schema='public' and table_name in ('recibos','recibo_emisores') group by table_name) t`],{encoding:"utf8"}));
+  const source=readFileSync("src/types/database.types.ts","utf8");
+  for (const table of tables) {
+    const block=source.split(`      ${table.table_name}: {`)[1].split("Row: {")[1].split("}")[0];
+    const names=[...block.matchAll(/(\w+):/g)].map(m=>m[1]).sort();
+    assert.deepEqual(names,table.columns,`${table.table_name}: tipos coinciden con catálogo aislado`);
+  }
+  console.log("Tipos de recibos/emisores: todas las columnas coinciden con el catálogo aislado.");
+}
+
+async function checkRecibosHttp() {
+  assert.ok(process.env.POSTGREST_BIN, "Configurar POSTGREST_BIN con PostgREST 14.5 o superior");
+  const args=["-X","-q","-A","-t","-v","ON_ERROR_STOP=1","-h",dir,"-p","5432","-U","postgres","-d","postgres"];
+  const query=sql=>execFileSync(pg("psql"),[...args,"-c",`select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false); ${sql}`],{encoding:"utf8"}).trim();
+  query(`select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);
+    create or replace function software_eventos_private.dia_argentina(p_instante timestamptz default statement_timestamp())
+    returns date language sql stable set search_path='' as $$select '2026-11-21'::date$$;
+    create or replace function auth.uid() returns uuid language sql stable as $$
+    select coalesce(nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'sub',nullif(current_setting('request.jwt.claim.sub',true),''))::uuid $$;
+    insert into pagos(id,evento_id,evento_servicio_id,fecha_pago,forma_pago,moneda,tipo_cambio,importe_moneda_original,registrado_por)
+    values('00000000-0000-0000-0000-000000001191','00000000-0000-0000-0000-000000000030','00000000-0000-0000-0000-000000000050','2026-11-16','transferencia','ARS',1,500,'00000000-0000-0000-0000-000000000002');`);
+  const gate=createServer();
+  await new Promise(resolve=>gate.listen(0,"127.0.0.1",resolve));
+  const port=gate.address().port;
+  await new Promise(resolve=>gate.close(resolve));
+  const secret="isolated-fictional-receipts-jwt-secret-at-least-32-bytes";
+  const jwt=actor=>{
+    const part=value=>Buffer.from(JSON.stringify(value)).toString("base64url");
+    const body=part({alg:"HS256",typ:"JWT"})+"."+part({role:"authenticated",sub:`00000000-0000-0000-0000-${String(actor).padStart(12,"0")}`,exp:Math.floor(Date.now()/1000)+300});
+    return body+"."+createHmac("sha256",secret).update(body).digest("base64url");
+  };
+  let logs="";
+  const api=spawn(process.env.POSTGREST_BIN,[],{env:{...process.env,PGRST_DB_URI:`postgresql://postgres@/postgres?host=${encodeURIComponent(dir)}&port=5432`,PGRST_DB_SCHEMAS:"public",PGRST_DB_ANON_ROLE:"anon",PGRST_JWT_SECRET:secret,PGRST_SERVER_HOST:"127.0.0.1",PGRST_SERVER_PORT:String(port)},stdio:["ignore","ignore","pipe"]});
+  api.stderr.on("data",d=>logs+=d);
+  api.on("error",error=>logs+=error.message);
+  const url=`http://127.0.0.1:${port}`;
+  const call=(path,actor,method="GET",body)=>fetch(url+path,{method,headers:{...(actor?{Authorization:`Bearer ${jwt(actor)}`}:{}) ,"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});
+  try {
+    const deadline=Date.now()+10000;
+    while(true) {
+      try { const response=await call("/",1); if(response.ok) break; } catch { /* Aún está iniciando el servidor local. */ }
+      assert.ok(Date.now()<deadline,`PostgREST no inició: ${logs}`);
+      await new Promise(resolve=>setTimeout(resolve,100));
+    }
+    assert.equal((await call("/recibos")).status,401);
+    assert.deepEqual(await (await call("/recibos",3)).json(),[]);
+    const partial="/recibos?pago_id=eq.00000000-0000-0000-0000-000000001112";
+    assert.deepEqual(await (await call(partial,4)).json(),[]);
+    assert.equal((await call("/rpc/previsualizar_recibo",4,"POST",{p_pago:"00000000-0000-0000-0000-000000001112"})).status,403);
+    const id="00000000-0000-0000-0000-000000001191";
+    const preview=await call("/rpc/previsualizar_recibo",2,"POST",{p_pago:id});
+    assert.equal(preview.status,200); assert.equal((await preview.json()).version,1);
+    const issued=await Promise.all([0,1].map(async()=>{
+      const response=await call("/rpc/emitir_recibo",2,"POST",{p_pago:id});
+      assert.equal(response.status,200); return response.json();
+    }));
+    assert.equal(issued[0],issued[1]);
+    let docs=await (await call(`/recibos?pago_id=eq.${id}&order=revision`,2)).json();
+    assert.equal(docs.length,1);
+    const original=docs[0].snapshot;
+    const changed=await call(`/pagos?id=eq.${id}`,2,"PATCH",{importe_moneda_original:600});
+    assert.equal(changed.status,204);
+    docs=await (await call(`/recibos?pago_id=eq.${id}&order=revision`,2)).json();
+    assert.equal(docs.length,2); assert.deepEqual(docs[0].snapshot,original);
+    assert.equal(docs[1].anterior_id,docs[0].id); assert.equal(docs[1].snapshot.pago.importe_en_pesos,600);
+    query(`update catering_contratos set pax_adultos=89 where id='00000000-0000-0000-0000-000000001110'`);
+    const reassigned=await call("/rpc/reasignar_excedente_catering",1,"POST",{
+      p_catering:"00000000-0000-0000-0000-000000001110",p_pago:"00000000-0000-0000-0000-000000001112",p_categoria:"adultos",p_cantidad:1,
+      p_destino:"00000000-0000-0000-0000-000000000050",p_es_catering:false,p_liberada_esperada:10,p_importe_esperado:200,
+    });
+    assert.equal(reassigned.status,204,await reassigned.text());
+    const revisions=await (await call(partial+"&order=revision",1)).json();
+    assert.equal(revisions.length,3); assert.equal(revisions[2].tipo,"modificacion");
+    console.log("HTTP real PostgREST: JWT firmado ficticio, RLS, preview, emisión concurrente, corrección y sobrecarga de reasignación aprobados; Supabase Auth no está incluido en esta prueba.");
+  } finally {
+    if (api.pid && api.exitCode === null && api.signalCode === null) {
+      const closed = new Promise(resolve=>api.once("close",resolve));
+      api.kill("SIGTERM"); await closed;
+    }
+  }
 }

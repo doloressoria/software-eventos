@@ -1,16 +1,17 @@
-import { nombreCategoria, type CoberturaPax, type TarifaPax, type FiscalCatering, type ComponenteCatering } from "@/lib/catering/coberturas";
+import { nombreCategoria, totalesCobertura, type CoberturaPax, type TarifaPax, type FiscalCatering, type ComponenteCatering } from "@/lib/catering/coberturas";
 import { categoriasPax } from "@/lib/eventos/asistentes";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const currency = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" });
 
 export function CoberturaResumen({ tarifas, label }: { tarifas: TarifaPax[]; label?: string }) {
+  const total = totalesCobertura(tarifas);
   return <div className="space-y-2">
     <h3 className="font-medium">{label ? `Cobertura por personas · ${label}` : "Cobertura por personas"}</h3>
     <Table>
       <TableHeader>
         <TableRow>
-          {["Categoría", "Contratados", "Cubiertos", "Por acreditar", "Pendientes", "Excedente", "Saldo de PAX"].map((heading) =>
+          {["Categoría", "Contratados", "Cubiertos", "Por acreditar", "Pendientes", "Excedentes", "Saldo de PAX"].map((heading) =>
             <TableHead key={heading}>{heading}</TableHead>)}
         </TableRow>
       </TableHeader>
@@ -24,18 +25,26 @@ export function CoberturaResumen({ tarifas, label }: { tarifas: TarifaPax[]; lab
             <TableCell>{tarifa.cubiertos ?? 0}</TableCell>
             <TableCell>{tarifa.por_acreditar ?? 0}</TableCell>
             <TableCell>{tarifa.pendientes ?? 0}</TableCell>
-            <TableCell>
-              {tarifa.excedente ?? 0}
-              {Boolean(tarifa.excedente) && (tarifa.tarifas_historicas ?? 0) > 1 && (
-                <p className="text-xs text-amber-800">Pendiente definir qué tarifa histórica liberar primero.</p>
-              )}
-            </TableCell>
+            <TableCell>{tarifa.excedente ?? 0}</TableCell>
             <TableCell>{currency.format(tarifa.saldo_categoria ?? 0)}</TableCell>
           </TableRow>;
         })}
+        <TableRow className="font-semibold">
+          <TableCell>Total</TableCell>
+          {[total.pax, total.cubiertos, total.por_acreditar, total.pendientes, total.excedente].map((value, i) => <TableCell key={i}>{value}</TableCell>)}
+          <TableCell>{currency.format(total.saldo_categoria)}</TableCell>
+        </TableRow>
       </TableBody>
     </Table>
-    <p className="text-xs text-slate-600">Los PAX por acreditar siguen pendientes hasta que se acredite el cheque. El saldo del catering también contempla cargos fijos, comisión y cobros por importe.</p>
+    <p className="text-xs text-slate-600">Por acreditar está incluido en Pendientes hasta la acreditación del cheque; no se suma otra vez. Saldo de PAX es sólo personas pendientes a tarifa vigente; el saldo general también contempla cargos fijos, comisión, IVA separado y cobros por importe.</p>
+    <details><summary className="cursor-pointer text-sm">Cantidad × tarifa vigente por categoría</summary>
+      <ul className="mt-2 space-y-2 text-sm">{tarifas.map(t => <li key={t.categoria}>
+        {nombreCategoria(t.categoria ?? "")} · {t.pax ?? 0} × base {currency.format(t.precio_base ?? 0)} = {currency.format((t.pax ?? 0) * (t.precio_base ?? 0))}
+        {" · "}{t.pax ?? 0} × adicionales {currency.format(t.adicional_unitario ?? 0)} = {currency.format((t.pax ?? 0) * (t.adicional_unitario ?? 0))}
+        {" · "}Subtotal {t.version_calculo === 2 ? "capital sin IVA" : "con IVA incluido (versión 1)"}: {currency.format((t.pax ?? 0) * (t.precio_aplicado ?? 0))}
+      </li>)}</ul>
+      <p className="mt-2 text-xs text-slate-600">Los cargos fijos se cobran una sola vez. En versión 2 el IVA se muestra separado en el resumen fiscal. Estos subtotales vigentes no reemplazan la cobertura histórica.</p>
+    </details>
   </div>;
 }
 

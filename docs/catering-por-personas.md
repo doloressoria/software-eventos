@@ -1,5 +1,7 @@
 # Catering por categoría y cobros por personas
 
+> Revisión 16/11: [totales PAX y selección explícita de coberturas de origen](revision-reunion-20261116.md). La nueva sobrecarga de reasignación admite varias tarifas históricas sin FIFO/LIFO y exige confirmar el importe real. Requiere la nueva migración de recibos/excedentes; no se aplicó remotamente en esta tarea.
+
 > Actualización 15/11/2026: [IVA separado y redondeo USD](catering-iva-separado-usd.md).
 > Las reglas siguientes describen el modelo histórico; la versión 2 se documenta allí.
 

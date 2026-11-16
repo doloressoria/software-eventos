@@ -340,3 +340,18 @@ antes de publicar. No recuperar una vigencia pasada usando el saldo actual.
 ```sh
 PG_BIN=/opt/homebrew/opt/postgresql@17/bin pnpm test:ipc:db
 ```
+
+### Recibos individuales y totales PAX
+
+Ingresos permite previsualizar y emitir un recibo PDF por cobro. La emisión
+persiste el contenido y la serie/número; correcciones y bajas generan documentos
+vinculados. El Excel general sigue siendo una descarga independiente.
+Ver [diagnóstico, matriz de evidencia y SQL en orden](docs/revision-reunion-20261116.md)
+y [operación de recibos y permisos](docs/recibos-individuales.md).
+
+```sh
+PG_BIN=/opt/homebrew/opt/postgresql@17/bin pnpm test:recibos:db
+pnpm recibos:examples
+# Validación de transporte con PostgREST instalado, sólo en el clúster ficticio:
+PG_BIN=/ruta/postgresql/bin POSTGREST_BIN=/ruta/postgrest pnpm test:recibos:http
+```
