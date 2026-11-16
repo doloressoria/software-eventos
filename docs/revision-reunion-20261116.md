@@ -214,3 +214,14 @@ que dispara la integración Git de main en Vercel.
 El código y los SQL se entregan en main. El seguimiento del push y del despliegue
 correspondiente se comunica en el chat; el registro anterior de Vercel en 8e4e398e
 corresponde al diagnóstico inicial, no al commit de esta entrega.
+
+### Empaquetado de PDF en Vercel
+
+El primer despliegue del commit `0be5568c` compiló correctamente pero Vercel
+rechazó el paquete de funciones por archivos dentro de directorios enlazados.
+La inclusión manual `node_modules/pdfkit/js/data/*.afm` agregaba rutas hijas
+del symlink de pnpm además de las rutas físicas que Next ya detectaba.
+Se retiraron esas dos inclusiones redundantes. El tracing automático sigue
+incluyendo `Helvetica.afm` y `Helvetica-Bold.afm` en ambas rutas PDF, comprobadas
+como archivos existentes sin rutas hijas del symlink. Lint, typecheck y build
+volvieron a pasar con esa corrección. La migración aplicada no cambió.
