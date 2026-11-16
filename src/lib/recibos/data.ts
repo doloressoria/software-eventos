@@ -27,6 +27,6 @@ export async function loadReciboContext(client: SupabaseClient<Database>, scope:
       result.error.code === "23514" ? "Configurá un emisor de recibos antes de emitir para este negocio." : "No se puede previsualizar el cobro completo con estos permisos.");
     snapshot = result.data as unknown as ReciboSnapshot;
   }
-  if (snapshot?.version !== 1) throw new ExportError(500, "Versión de recibo no compatible.");
+  if (snapshot?.version !== 1 && snapshot?.version !== 2) throw new ExportError(500, "Versión de recibo no compatible.");
   return { documents, snapshot, anulado: payment.deleted_at !== null };
 }

@@ -2,7 +2,7 @@ import type { Tables } from "../../types/database.types";
 import type { CoberturaPax, ComponenteCatering } from "../catering/coberturas";
 
 export type ReciboSnapshot = {
-  version: 1;
+  version: 1 | 2;
   marca: string;
   logo_data_url: string | null;
   cliente: string | null;
@@ -11,7 +11,7 @@ export type ReciboSnapshot = {
   lugar: string | null;
   pax_evento: Record<string, number>;
   pago: Pick<Tables<"pagos">, "id" | "concepto" | "fecha_pago" | "forma_pago" | "moneda" | "importe_moneda_original" | "tipo_cambio" | "importe_en_pesos" | "banco" | "numero_cheque" | "deleted_at" | "es_garantia">;
-  imputaciones: { concepto: string; importe_ars: number | null; catering_contrato_id: string | null }[];
+  imputaciones: { categoria?: string | null; concepto: string; importe_ars: number | null; catering_contrato_id: string | null }[];
   coberturas: CoberturaPax[];
   componentes: ComponenteCatering[];
   estado_acreditacion: string;

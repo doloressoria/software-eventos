@@ -83,6 +83,9 @@ try {
           readFileSync("supabase/verification/preflight-recibos.sql", "utf8"),
           readFileSync("supabase/migrations/20261116222142_recibos_persistentes_y_excedentes.sql", "utf8").replace(/^begin;\n|\ncommit;\n$/g, ""),
           readFileSync("supabase/tests/recibos.sql", "utf8"),
+          "create temporary table recibos_v1_antes as select id,snapshot,fuente from public.recibos;",
+          readFileSync("supabase/migrations/20261116224116_recibo_formato_talonario.sql", "utf8").replace(/^begin;\n|^commit;\n/gm, ""),
+          readFileSync("supabase/tests/recibo-talonario.sql", "utf8"),
           readFileSync("supabase/verification/postflight-recibos.sql", "utf8"),
         ] : []),
         "commit;",
@@ -442,7 +445,7 @@ async function checkRecibosHttp() {
     assert.equal((await call("/rpc/previsualizar_recibo",4,"POST",{p_pago:"00000000-0000-0000-0000-000000001112"})).status,403);
     const id="00000000-0000-0000-0000-000000001191";
     const preview=await call("/rpc/previsualizar_recibo",2,"POST",{p_pago:id});
-    assert.equal(preview.status,200); assert.equal((await preview.json()).version,1);
+    assert.equal(preview.status,200); assert.equal((await preview.json()).version,2);
     const issued=await Promise.all([0,1].map(async()=>{
       const response=await call("/rpc/emitir_recibo",2,"POST",{p_pago:id});
       assert.equal(response.status,200); return response.json();

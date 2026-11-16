@@ -7,8 +7,9 @@ import { exampleRecibo } from "./fixtures";
 import { reciboPath } from "./types";
 
 const scope = { kind: "eventos" as const, id: "00000000-0000-4000-8000-000000000001", pagoId: "00000000-0000-4000-8000-000000000002" };
-function fake({ auth = true, event = scope.id, catering = null as string | null, documents = false, rpcCode = null as string | null, fail = false } = {}) {
+function fake({ auth = true, event = scope.id, catering = null as string | null, documents = false, rpcCode = null as string | null, fail = false, version = 2 as 1 | 2 } = {}) {
   const sample = exampleRecibo();
+  sample.snapshot.version = version; sample.recibo.snapshot = JSON.parse(JSON.stringify(sample.snapshot));
   let previews = 0;
   const client = {
     auth: { getUser: async () => ({ data: { user: auth ? { id: "test-user" } : null }, error: null }) },
@@ -33,12 +34,14 @@ test("contexto exige sesión, pertenencia y permiso completo en RPC; no entrega 
   const external = { kind: "catering" as const, id: scope.id, pagoId: scope.pagoId };
   await assert.rejects(loadReciboContext(fake({ catering: external.id }).client, external), { status: 404 });
   const allowed = await loadReciboContext(fake({ event: null as unknown as string, catering: external.id }).client, external);
-  assert.equal(allowed.snapshot.version, 1);
+  assert.equal(allowed.snapshot.version, 2);
 });
 test("re-descarga usa snapshot persistido y aborta si falla lectura de documentos", async () => {
   const f = fake({ documents: true });
   const result = await loadReciboContext(f.client, scope);
   assert.equal(result.documents.length, 1);
+  const legacy = await loadReciboContext(fake({ documents: true, version: 1 }).client, scope);
+  assert.equal(legacy.snapshot.version, 1);
   assert.equal(f.previews(), 0, "no recalcula una instantánea emitida");
   await assert.rejects(loadReciboContext(fake({ fail: true }).client, scope), { status: 500 });
   assert.equal(reciboPath(scope), `/eventos/${scope.id}/ingresos/recibos/${scope.pagoId}`);

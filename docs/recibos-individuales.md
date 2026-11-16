@@ -92,9 +92,10 @@ en un comprobante nuevo. La anulación registra referencia histórica; no simula
 una devolución de caja. Un cambio de día de un cheque no modifica documentos:
 Ingresos muestra el estado actual y el PDF conserva el de emisión.
 
-El renderizador consume sólo snapshot versión 1, con metadatos de fecha fijos;
-la prueba compara bytes de dos descargas. Cambios futuros de formato requieren
-conservar este renderizador y agregar una nueva versión. No se reconsulta el
+Los snapshots versión 1 conservan su renderizador original, con metadatos de
+fecha fijos. La versión 2 usa el formato de talonario descrito al final. Las
+pruebas comparan descargas idénticas y la huella del PDF anterior al rediseño.
+Cambios futuros de formato requieren otra versión, conservando las anteriores. No se reconsulta el
 cliente, la cotización, los precios ni la configuración para renderizar emitidos.
 
 ## Contenido monetario
@@ -172,3 +173,48 @@ ficticio, RLS, preview, emisión concurrente, corrección por HTTP y la sobrecar
 de reasignación. No usa Supabase Auth del proveedor ni datos de producción.
 El acceso público real a Auth responde 200 y el de lectura de recibos responde
 401, como corresponde. Esto no acredita un login ni una operación de cobro real.
+
+## Formato de talonario — 16/11/2026
+
+Se tomó la foto adjunta como referencia visual: marco exterior, marca a la
+izquierda, X y leyenda no fiscal al centro, identificación y fecha en casilleros,
+campos con líneas punteadas, tabla de conceptos/opción/importe, tabla del medio
+de pago, total y firmas al pie. La marca sigue siendo la configurada en el
+snapshot. No se copia la marca ni el número de la foto.
+
+Los recibos habituales caben en A4 de una página. Las tablas repiten encabezados
+cuando continúan y conservan los textos largos. Un único medio por cobro sigue
+siendo el único medio recibido: las líneas vacías son parte del diseño y la
+moneda original/cotización es referencia del mismo ingreso. Se distinguen total
+pendiente de acreditación, garantía, capital/IVA y ajustes sin volverlos ingreso.
+
+El cambio de formato es **prospectivo**. El frontend acepta snapshots 1 y 2;
+`pdf-v1.ts` conserva el formato de los emitidos. Se verifica la huella SHA-256
+del ejemplo versión 1 anterior al rediseño, además de comparar las descargas.
+No se actualiza ninguna fila de recibo, pago, cobertura o componente existente.
+La nueva versión agrega la categoría real del catálogo a cada concepto para
+identificar SALÓN/CATERING sin deducirla del nombre comercial.
+
+Orden de activación (compatibilidad del frontend primero):
+
+1. Publicar y verificar el frontend compatible con ambas versiones. Con la RPC
+   anterior, los recibos siguen usando el formato 1; no hay ventana de respuestas
+   que el frontend publicado no pueda interpretar.
+2. Guardar inventario y ejecutar la verificación de sólo lectura
+   [recibo-formato-talonario.sql](../supabase/verification/recibo-formato-talonario.sql).
+3. Aplicar completo, con BEGIN/COMMIT,
+   [20261116224116_recibo_formato_talonario.sql](../supabase/migrations/20261116224116_recibo_formato_talonario.sql).
+   Sólo reemplaza el constructor privado del snapshot: futuras emisiones,
+   previews y comprobantes vinculados reciben versión 2. Reintentar una emisión
+   previa devuelve su original versión 1.
+4. Repetir la verificación e inventario: deben conservarse las huellas de recibos
+   y datos financieros; función privada y cero cadenas/versiones inconsistentes.
+   Alinear el archivo al identificador registrado por el conector si corresponde.
+
+Validación local: lint, typecheck, build, **151 pruebas TS**, **167 comprobaciones
+SQL** y transporte real con PostgREST/JWT ficticio aprobados. Los tres ejemplos
+ficticios se renderizaron e inspeccionaron: 1/4/1 páginas. Se comprobaron textos,
+importes, límites de página y una fila de 8.000 caracteres (incluida su repetición
+en el desglose), sin omitir caracteres. No se agregaron dependencias ni se cambió
+el cálculo de caja/deuda. No hacer rollback a un frontend que rechace versión 2
+tras activarla; conservar el soporte de ambos formatos.
