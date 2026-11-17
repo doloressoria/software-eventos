@@ -250,6 +250,7 @@ export default async function EventoDetallePage({
         monthlyPriceSuggestions={valores.monthlyPriceSuggestions}
         servicios={valores.servicios}
         totalEvento={valores.totalEvento}
+        paxTotal={totalInvitados(evento)}
       />
     </ExportExcelScope>
   );

@@ -111,6 +111,33 @@ test("evento conserva formato, IVA parcial, divisas, contactos y resultados ante
   assert.ok(loaded.definedNames.getRanges("TotalServiciosDetalle").ranges.length);
 });
 
+test("cotización automática usa servicios actuales y PAX del evento sin sumar catering ni restar cobros", async () => {
+  const data = exampleEvent(4);
+  const linked = exampleCatering();
+  linked.catering.total_con_iva = 9_000_000;
+  linked.catering.pax_adultos = 50;
+  data.caterings = [{ catering: linked.catering, payments: linked.payments }];
+  const label = "Cotización por persona — servicios ÷ PAX del evento";
+  const readQuote = async () => {
+    const book = await buildCommercialWorkbook(data);
+    const reopened = new ExcelJS.Workbook();
+    await reopened.xlsx.load(await book.xlsx.writeBuffer());
+    return amount(reopened, "CLIENTE", label, 7);
+  };
+  assert.equal(await readQuote(), 951.67); // 11.420 / 12, incluido IVA parcial.
+  data.services[0].ajuste_ipc = 1000;
+  data.services[0].total_con_iva! += 1000;
+  assert.equal(await readQuote(), 1035);
+  data.services.pop();
+  assert.equal(await readQuote(), 993.33);
+  data.event.pax_adultos = 22;
+  assert.equal(await readQuote(), 496.67);
+  data.services = [];
+  assert.equal(await readQuote(), 0);
+  data.event.pax_adultos = data.event.pax_jovenes = 0;
+  assert.equal(await readQuote(), null);
+});
+
 test("catering extiende pagos, ítems e historial y reconcilia hojas para cobros legados", async () => {
   const data = exampleCatering({ paymentCount: 35, itemCount: 18 });
   const amounts = cateringAmounts(data);

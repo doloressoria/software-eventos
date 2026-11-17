@@ -113,7 +113,7 @@ export default async function CateringDetallePage({
               <DetailItem label="Bebes" value={catering.pax_bebes} />
               <DetailItem label="PAX total" value={paxTotal} />
               <DetailItem
-                label="Precio vigente x persona"
+                label="Tarifa base del catering x persona sin IVA"
                 value={precioVigente !== null ? formatCurrency(precioVigente) : "-"}
               />
             </dl>

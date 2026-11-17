@@ -22,6 +22,7 @@ import type {
   ServicioCatalogoOption,
 } from "@/lib/evento-servicios/queries";
 import { getCategoriaServicioLabel } from "@/lib/evento-servicios/queries";
+import { cotizacionPorPersona } from "@/lib/eventos/cotizacion";
 import {
   getEmptyEventoServicioFormState,
   getEventoServicioFieldsFromValues,
@@ -36,6 +37,7 @@ type ValoresEventoSectionProps = {
   servicios: EventoServicioItem[];
   tieneOrganizador: boolean;
   totalEvento: number;
+  paxTotal: number;
 };
 
 export function ValoresEventoSection({
@@ -46,7 +48,9 @@ export function ValoresEventoSection({
   servicios,
   tieneOrganizador,
   totalEvento,
+  paxTotal,
 }: ValoresEventoSectionProps) {
+  const cotizacion = cotizacionPorPersona(totalEvento, paxTotal);
   const totalCatering = caterings.reduce(
     (total, catering) => total + (catering.total_con_iva ?? 0),
     0,
@@ -73,6 +77,17 @@ export function ValoresEventoSection({
               {formatCurrency(totalEvento)}
             </p>
           </div>
+          <div className="rounded-lg border border-teal-100 bg-teal-50/60 px-4 py-3 text-right">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+              Cotización por persona
+            </p>
+            <p className="mt-1 text-lg font-semibold text-slate-950">
+              {cotizacion === null ? "Cargá los PAX" : formatCurrency(cotizacion)}
+            </p>
+            <p className="mt-1 text-xs text-slate-600">
+              Total servicios ÷ {paxTotal} PAX del evento
+            </p>
+          </div>
           {caterings.length > 0 ? (
             <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-4 py-3 text-right">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -86,6 +101,10 @@ export function ValoresEventoSection({
         </div>
       </CardHeader>
       <CardContent className="space-y-8">
+        <p className="text-sm text-slate-600">
+          La cotización por persona se actualiza al guardar servicios o PAX. Incluye
+          adicionales, IVA e IPC de los servicios. El catering vinculado se muestra por separado.
+        </p>
         {tieneOrganizador ? (
           <div>
             <h3 className="text-sm font-semibold text-slate-950">

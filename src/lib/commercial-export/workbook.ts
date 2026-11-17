@@ -1,7 +1,8 @@
 import ExcelJS from "exceljs";
 import path from "node:path";
 import { nombreCategoria, totalesCobertura } from "../catering/coberturas";
-import { categoriasPax } from "../eventos/asistentes";
+import { categoriasPax, totalInvitados } from "../eventos/asistentes";
+import { cotizacionPorPersona } from "../eventos/cotizacion";
 import { cateringAmounts, ordinaryPayments, PARTIAL_NOTICE, paymentAmount, SEPARATE_NOTICE, serviceAmounts, uniquePayments } from "./calculations";
 import { getArgentinaPaymentDay, isChequePending, roundMoney, sumGuarantees, sumOrdinaryPayments, toMoneyNumber } from "../pagos/calculos";
 import { ExportError, type CateringExportData, type CommercialExportData, type EventExportData, type ExportContact, type ExportPayment, type PaymentHistoryExportData } from "./types";
@@ -178,7 +179,13 @@ function eventWorkbook(book: ExcelJS.Workbook, template: ExcelJS.Workbook, data:
   total(sheet, source, r, "Total servicios — detalle", eventTotal);
   book.definedNames.add(`'CLIENTE'!$G$${r}`, "TotalServiciosDetalle");
   if (serviceRows.length) sheet.getCell(`G${r}`).value = { formula: `SUM(G${serviceRows[0]}:G${r - 1})`, result: eventTotal };
-  r += 2;
+  r++;
+  const cotizacion = cotizacionPorPersona(eventTotal, totalInvitados(e));
+  total(sheet, source, r++, "Cotización por persona — servicios ÷ PAX del evento", cotizacion);
+  note(sheet, source, r++, cotizacion === null
+    ? "Cargá los PAX del evento para calcular la cotización por persona."
+    : `Total final de servicios (incluye adicionales, IVA e IPC) ÷ ${totalInvitados(e)} PAX del evento. El catering vinculado se presenta por separado.`);
+  r++;
   if (!data.updates.length) note(sheet, source, r++, "No hay antecedentes de actualización disponibles para esta descarga. Los precios actuales se conservan sin reconstruir ajustes.");
   band(sheet, source, r++, "IVA PARCIAL Y SALDOS POR SERVICIO");
   row(sheet, source, r++, 28, ["Servicio", "Neto ARS", "Base IVA ARS", "IVA %", "IVA ARS", "Pagado ARS", "Saldo ARS"]);
